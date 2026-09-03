@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Appointment.API/Appointment.API.csproj" Id="1a0b0d7b-1c88-42e8-a56c-e3e5be55a623" />
+  <Project Path="Appointment.Application/Appointment.Application.csproj" Id="2424cdf2-6f3b-4f23-9084-3f02bc16f347" />
+  <Project Path="Appointment.Domain/Appointment.Domain.csproj" Id="7a7af42e-963d-4981-b4bc-7736d6ab0411" />
+  <Project Path="Appointment.Infrastructure/Appointment.Infrastructure.csproj" Id="2c6460d5-200e-4914-b871-19266c6c4314" />
+</Solution>
