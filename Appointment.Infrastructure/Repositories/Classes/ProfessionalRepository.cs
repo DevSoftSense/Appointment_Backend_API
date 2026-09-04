@@ -25,7 +25,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
 
     public async Task<IReadOnlyList<ProfessionalListItemDto>> GetProfessionalsAsync(
         int orgId,
-        int productId,
+        int appId,
         GetProfessionalsRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -36,7 +36,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_professionals",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 Varchar(request.Search),
                 Varchar(request.Status),
                 Int(request.Limit),
@@ -59,7 +59,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
 
     public async Task<ProfessionalDetailDto?> GetProfessionalByIdAsync(
         int orgId,
-        int productId,
+        int appId,
         int employeeId,
         CancellationToken cancellationToken = default)
     {
@@ -70,7 +70,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
                 "appointment.fn_appointment_get_professional_by_id",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 Int(employeeId));
 
             if (string.IsNullOrWhiteSpace(json) || json == "null")
@@ -92,7 +92,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
 
     public async Task<CreateProfessionalResponse> CreateProfessionalAsync(
         int orgId,
-        int productId,
+        int appId,
         CreateProfessionalRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -103,7 +103,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
                 "appointment.fn_appointment_create_professional",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 NullableInt(request.FiscalYearId),
                 Varchar(request.FullName),
                 Varchar(request.Email),
@@ -133,9 +133,84 @@ public sealed class ProfessionalRepository : IProfessionalRepository
         }
     }
 
+    public async Task<CreateProfessionalResponse> UpdateProfessionalAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        UpdateProfessionalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
+                "appointment.fn_appointment_update_professional",
+                Int(orgId),
+                Int(appId),
+                Int(employeeId),
+                Varchar(request.FullName),
+                Varchar(request.Email),
+                Varchar(request.Phone),
+                Varchar(request.Gender),
+                Date(request.DateOfBirth),
+                Date(request.JoinDate),
+                Varchar(request.EmploymentType),
+                NullableInt(request.BranchId),
+                NullableInt(request.DepartmentId),
+                NullableInt(request.StaffRoleId),
+                Varchar(request.Address),
+                Varchar(request.Status));
+
+            return JsonSerializer.Deserialize<CreateProfessionalResponse>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("fn_appointment_update_professional returned no data");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_update_professional for employeeId {EmployeeId}", employeeId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize fn_appointment_update_professional for employeeId {EmployeeId}", employeeId);
+            throw new InvalidOperationException("Update professional response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<CreateProfessionalResponse> DeactivateProfessionalAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
+                "appointment.fn_appointment_deactivate_professional",
+                Int(orgId),
+                Int(appId),
+                Int(employeeId));
+
+            return JsonSerializer.Deserialize<CreateProfessionalResponse>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("fn_appointment_deactivate_professional returned no data");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_deactivate_professional for employeeId {EmployeeId}", employeeId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize fn_appointment_deactivate_professional for employeeId {EmployeeId}", employeeId);
+            throw new InvalidOperationException("Deactivate professional response could not be parsed.", ex);
+        }
+    }
+
     public async Task<IReadOnlyList<BranchDto>> GetBranchesAsync(
         int orgId,
-        int productId,
+        int appId,
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
@@ -145,7 +220,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_branches",
                 Int(orgId),
-                Int(productId));
+                Int(appId));
 
             return JsonSerializer.Deserialize<List<BranchDto>>(json, PostgresJsonOptions.Options) ?? [];
         }
@@ -163,7 +238,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
 
     public async Task<IReadOnlyList<DepartmentDto>> GetDepartmentsAsync(
         int orgId,
-        int productId,
+        int appId,
         int? branchId,
         CancellationToken cancellationToken = default)
     {
@@ -174,7 +249,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_departments",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 NullableInt(branchId));
 
             return JsonSerializer.Deserialize<List<DepartmentDto>>(json, PostgresJsonOptions.Options) ?? [];
@@ -193,7 +268,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
 
     public async Task<IReadOnlyList<ProfessionalRoleDto>> GetRolesAsync(
         int orgId,
-        int productId,
+        int appId,
         int? branchId,
         CancellationToken cancellationToken = default)
     {
@@ -204,7 +279,7 @@ public sealed class ProfessionalRepository : IProfessionalRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_professional_roles",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 NullableInt(branchId));
 
             return JsonSerializer.Deserialize<List<ProfessionalRoleDto>>(json, PostgresJsonOptions.Options) ?? [];

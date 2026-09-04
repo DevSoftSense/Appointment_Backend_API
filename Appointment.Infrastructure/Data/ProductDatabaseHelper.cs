@@ -6,7 +6,7 @@ using Npgsql;
 namespace Appointment.Infrastructure.Data;
 
 /// <summary>
-/// Executes PostgreSQL functions on SOC_SaaS_Product (DefaultConnection).
+/// Executes PostgreSQL functions on SOC_SaaS_Product (SecondConnection).
 /// Appointment module repositories call this — no business DTOs here.
 /// </summary>
 public sealed class ProductDatabaseHelper
@@ -16,8 +16,10 @@ public sealed class ProductDatabaseHelper
 
     public ProductDatabaseHelper(IConfiguration configuration, ILogger<ProductDatabaseHelper> logger)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+        _connectionString = configuration.GetConnectionString("SecondConnection")
+            ?? configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "Connection string 'SecondConnection' (or 'DefaultConnection') is not configured.");
         _logger = logger;
     }
 

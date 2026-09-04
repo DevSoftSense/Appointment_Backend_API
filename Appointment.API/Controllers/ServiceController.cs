@@ -1,6 +1,6 @@
 using Appointment.API.Helpers;
 using Appointment.Application.Services.Interfaces;
-using Appointment.Domain.DTOs.Customers.Requests;
+using Appointment.Domain.DTOs.Services.Requests;
 using Appointment.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,40 +10,38 @@ namespace Appointment.API.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/customers")]
-public sealed class CustomerController : ControllerBase
+[Route("api/services")]
+public sealed class ServiceController : ControllerBase
 {
-    private readonly ICustomerService _customerService;
-    private readonly ILogger<CustomerController> _logger;
+    private readonly IServiceCatalogService _serviceCatalogService;
+    private readonly ILogger<ServiceController> _logger;
 
-    public CustomerController(ICustomerService customerService, ILogger<CustomerController> logger)
+    public ServiceController(IServiceCatalogService serviceCatalogService, ILogger<ServiceController> logger)
     {
-        _customerService = customerService;
+        _serviceCatalogService = serviceCatalogService;
         _logger = logger;
     }
 
-    /// <summary>GET api/customers?search=&amp;status=&amp;limit=&amp;offset=</summary>
+    /// <summary>GET api/services?search=&amp;isActive=&amp;limit=&amp;offset=</summary>
     [HttpGet]
-    public async Task<IActionResult> GetCustomersAsync(
+    public async Task<IActionResult> GetServicesAsync(
         [FromQuery] string? search,
-        [FromQuery] string? status,
+        [FromQuery] bool? isActive,
         [FromQuery] int limit = 50,
         [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetAuthContext(out var userId, out var orgId))
+        if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
-
-        _ = userId;
 
         try
         {
-            var result = await _customerService.GetCustomersAsync(
+            var result = await _serviceCatalogService.GetServicesAsync(
                 orgId,
-                new GetCustomersRequest
+                new GetServicesRequest
                 {
                     Search = search,
-                    Status = status,
+                    IsActive = isActive,
                     Limit = limit,
                     Offset = offset
                 },
@@ -57,26 +55,26 @@ public sealed class CustomerController : ControllerBase
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Customer list failed in DB function.");
+            _logger.LogWarning(ex, "Service list failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in GET api/customers");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load customers." });
+            _logger.LogError(ex, "Unhandled error in GET api/services");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load services." });
         }
     }
 
-    /// <summary>GET api/customers/account-types</summary>
-    [HttpGet("account-types")]
-    public async Task<IActionResult> GetAccountTypesAsync(CancellationToken cancellationToken = default)
+    /// <summary>GET api/services/categories</summary>
+    [HttpGet("categories")]
+    public async Task<IActionResult> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
         try
         {
-            var result = await _customerService.GetAccountTypesAsync(orgId, cancellationToken);
+            var result = await _serviceCatalogService.GetCategoriesAsync(orgId, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -85,20 +83,20 @@ public sealed class CustomerController : ControllerBase
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Account types failed in DB function.");
+            _logger.LogWarning(ex, "Service categories failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in GET api/customers/account-types");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load account types." });
+            _logger.LogError(ex, "Unhandled error in GET api/services/categories");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load categories." });
         }
     }
 
-    /// <summary>GET api/customers/{accountId}</summary>
-    [HttpGet("{accountId:int}")]
-    public async Task<IActionResult> GetCustomerByIdAsync(
-        int accountId,
+    /// <summary>GET api/services/{productId}</summary>
+    [HttpGet("{productId:int}")]
+    public async Task<IActionResult> GetServiceByIdAsync(
+        int productId,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
@@ -106,9 +104,9 @@ public sealed class CustomerController : ControllerBase
 
         try
         {
-            var result = await _customerService.GetCustomerByIdAsync(orgId, accountId, cancellationToken);
+            var result = await _serviceCatalogService.GetServiceByIdAsync(orgId, productId, cancellationToken);
             if (result is null)
-                return NotFound(new { message = "Customer not found." });
+                return NotFound(new { message = "Service not found." });
 
             return Ok(result);
         }
@@ -118,23 +116,23 @@ public sealed class CustomerController : ControllerBase
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Get customer failed in DB function.");
+            _logger.LogWarning(ex, "Get service failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in GET api/customers/{AccountId}", accountId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load customer." });
+            _logger.LogError(ex, "Unhandled error in GET api/services/{ProductId}", productId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load service." });
         }
     }
 
-    /// <summary>POST api/customers</summary>
+    /// <summary>POST api/services</summary>
     [HttpPost]
-    public async Task<IActionResult> CreateCustomerAsync(
-        [FromBody] CreateCustomerRequest request,
+    public async Task<IActionResult> CreateServiceAsync(
+        [FromBody] CreateServiceRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetAuthContext(out var userId, out var orgId))
+        if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
         if (request is null)
@@ -142,34 +140,34 @@ public sealed class CustomerController : ControllerBase
 
         try
         {
-            var result = await _customerService.CreateCustomerAsync(orgId, userId, request, cancellationToken);
+            var result = await _serviceCatalogService.CreateServiceAsync(orgId, request, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
         }
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (CustomerDuplicateEmailException ex)
+        catch (ServiceDuplicateNameException ex)
         {
             return Conflict(new { message = ex.Message });
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Create customer failed in DB function.");
+            _logger.LogWarning(ex, "Create service failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in POST api/customers");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create customer." });
+            _logger.LogError(ex, "Unhandled error in POST api/services");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create service." });
         }
     }
 
-    /// <summary>PUT api/customers/{accountId}</summary>
-    [HttpPut("{accountId:int}")]
-    public async Task<IActionResult> UpdateCustomerAsync(
-        int accountId,
-        [FromBody] UpdateCustomerRequest request,
+    /// <summary>PUT api/services/{productId}</summary>
+    [HttpPut("{productId:int}")]
+    public async Task<IActionResult> UpdateServiceAsync(
+        int productId,
+        [FromBody] UpdateServiceRequest request,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
@@ -180,33 +178,33 @@ public sealed class CustomerController : ControllerBase
 
         try
         {
-            var result = await _customerService.UpdateCustomerAsync(orgId, accountId, request, cancellationToken);
+            var result = await _serviceCatalogService.UpdateServiceAsync(orgId, productId, request, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (CustomerDuplicateEmailException ex)
+        catch (ServiceDuplicateNameException ex)
         {
             return Conflict(new { message = ex.Message });
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Update customer failed in DB function.");
+            _logger.LogWarning(ex, "Update service failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in PUT api/customers/{AccountId}", accountId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update customer." });
+            _logger.LogError(ex, "Unhandled error in PUT api/services/{ProductId}", productId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update service." });
         }
     }
 
-    /// <summary>DELETE api/customers/{accountId} — soft delete</summary>
-    [HttpDelete("{accountId:int}")]
-    public async Task<IActionResult> DeactivateCustomerAsync(
-        int accountId,
+    /// <summary>DELETE api/services/{productId} — sets is_active false</summary>
+    [HttpDelete("{productId:int}")]
+    public async Task<IActionResult> DeactivateServiceAsync(
+        int productId,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
@@ -214,7 +212,7 @@ public sealed class CustomerController : ControllerBase
 
         try
         {
-            var result = await _customerService.DeactivateCustomerAsync(orgId, accountId, cancellationToken);
+            var result = await _serviceCatalogService.DeactivateServiceAsync(orgId, productId, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -223,13 +221,13 @@ public sealed class CustomerController : ControllerBase
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "Deactivate customer failed in DB function.");
+            _logger.LogWarning(ex, "Deactivate service failed in DB function.");
             return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in DELETE api/customers/{AccountId}", accountId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to delete customer." });
+            _logger.LogError(ex, "Unhandled error in DELETE api/services/{ProductId}", productId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to deactivate service." });
         }
     }
 

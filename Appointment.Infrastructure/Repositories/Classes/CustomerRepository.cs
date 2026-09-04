@@ -25,7 +25,7 @@ public sealed class CustomerRepository : ICustomerRepository
 
     public async Task<IReadOnlyList<CustomerListItemDto>> GetCustomersAsync(
         int orgId,
-        int productId,
+        int appId,
         GetCustomersRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -36,7 +36,7 @@ public sealed class CustomerRepository : ICustomerRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_customers",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 Varchar(request.Search),
                 Varchar(request.Status),
                 Int(request.Limit),
@@ -59,7 +59,7 @@ public sealed class CustomerRepository : ICustomerRepository
 
     public async Task<CustomerDetailDto?> GetCustomerByIdAsync(
         int orgId,
-        int productId,
+        int appId,
         int accountId,
         CancellationToken cancellationToken = default)
     {
@@ -70,7 +70,7 @@ public sealed class CustomerRepository : ICustomerRepository
             var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
                 "appointment.fn_appointment_get_customer_by_id",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 Int(accountId));
 
             if (string.IsNullOrWhiteSpace(json) || json == "null")
@@ -92,7 +92,7 @@ public sealed class CustomerRepository : ICustomerRepository
 
     public async Task<CreateCustomerResponse> CreateCustomerAsync(
         int orgId,
-        int productId,
+        int appId,
         int? createdBy,
         CreateCustomerRequest request,
         CancellationToken cancellationToken = default)
@@ -104,7 +104,7 @@ public sealed class CustomerRepository : ICustomerRepository
             var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
                 "appointment.fn_appointment_create_customer",
                 Int(orgId),
-                Int(productId),
+                Int(appId),
                 NullableInt(request.FiscalYearId),
                 NullableInt(createdBy),
                 Varchar(request.DisplayName),
@@ -137,9 +137,86 @@ public sealed class CustomerRepository : ICustomerRepository
         }
     }
 
+    public async Task<CreateCustomerResponse> UpdateCustomerAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        UpdateCustomerRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
+                "appointment.fn_appointment_update_customer",
+                Int(orgId),
+                Int(appId),
+                Int(accountId),
+                Varchar(request.DisplayName),
+                Varchar(request.FirstName),
+                Varchar(request.LastName),
+                Varchar(request.Salutation),
+                Varchar(request.Email),
+                Varchar(request.PhoneMobile),
+                Varchar(request.PhoneMobileAlt),
+                Varchar(request.Gender),
+                Date(request.DateOfBirth),
+                NullableInt(request.AccountTypeId),
+                NullableInt(request.BranchId),
+                Varchar(request.PartyType),
+                Text(request.Remarks),
+                Varchar(request.Status));
+
+            return JsonSerializer.Deserialize<CreateCustomerResponse>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("fn_appointment_update_customer returned no data");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_update_customer for accountId {AccountId}", accountId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize fn_appointment_update_customer for accountId {AccountId}", accountId);
+            throw new InvalidOperationException("Update customer response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<DeactivateCustomerResponse> DeactivateCustomerAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
+                "appointment.fn_appointment_deactivate_customer",
+                Int(orgId),
+                Int(appId),
+                Int(accountId));
+
+            return JsonSerializer.Deserialize<DeactivateCustomerResponse>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("fn_appointment_deactivate_customer returned no data");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_deactivate_customer for accountId {AccountId}", accountId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize fn_appointment_deactivate_customer for accountId {AccountId}", accountId);
+            throw new InvalidOperationException("Deactivate customer response could not be parsed.", ex);
+        }
+    }
+
     public async Task<IReadOnlyList<AccountTypeDto>> GetAccountTypesForCustomerAsync(
         int orgId,
-        int productId,
+        int appId,
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
@@ -149,7 +226,7 @@ public sealed class CustomerRepository : ICustomerRepository
             var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
                 "appointment.fn_appointment_get_account_types_for_customer",
                 Int(orgId),
-                Int(productId));
+                Int(appId));
 
             return JsonSerializer.Deserialize<List<AccountTypeDto>>(json, PostgresJsonOptions.Options)
                    ?? [];

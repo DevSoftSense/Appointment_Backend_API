@@ -7,25 +7,38 @@ public interface ICustomerRepository
 {
     Task<IReadOnlyList<CustomerListItemDto>> GetCustomersAsync(
         int orgId,
-        int productId,
+        int appId,
         GetCustomersRequest request,
         CancellationToken cancellationToken = default);
 
     Task<CustomerDetailDto?> GetCustomerByIdAsync(
         int orgId,
-        int productId,
+        int appId,
         int accountId,
         CancellationToken cancellationToken = default);
 
     Task<CreateCustomerResponse> CreateCustomerAsync(
         int orgId,
-        int productId,
+        int appId,
         int? createdBy,
         CreateCustomerRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<CreateCustomerResponse> UpdateCustomerAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        UpdateCustomerRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<DeactivateCustomerResponse> DeactivateCustomerAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AccountTypeDto>> GetAccountTypesForCustomerAsync(
         int orgId,
-        int productId,
+        int appId,
         CancellationToken cancellationToken = default);
 }

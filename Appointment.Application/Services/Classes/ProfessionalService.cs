@@ -35,8 +35,8 @@ public sealed class ProfessionalService : IProfessionalService
         if (request.Limit <= 0) request.Limit = 50;
         if (request.Offset < 0) request.Offset = 0;
 
-        var productId = GetProductId();
-        var items = await _professionalRepository.GetProfessionalsAsync(orgId, productId, request, cancellationToken);
+        var appId = GetAppId();
+        var items = await _professionalRepository.GetProfessionalsAsync(orgId, appId, request, cancellationToken);
 
         return new ProfessionalListResponse
         {
@@ -54,8 +54,8 @@ public sealed class ProfessionalService : IProfessionalService
         if (employeeId <= 0)
             throw new ArgumentException("Professional id is required.", nameof(employeeId));
 
-        var productId = GetProductId();
-        return await _professionalRepository.GetProfessionalByIdAsync(orgId, productId, employeeId, cancellationToken);
+        var appId = GetAppId();
+        return await _professionalRepository.GetProfessionalByIdAsync(orgId, appId, employeeId, cancellationToken);
     }
 
     public async Task<CreateProfessionalResponse> CreateProfessionalAsync(
@@ -73,18 +73,63 @@ public sealed class ProfessionalService : IProfessionalService
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             throw new ArgumentException("Email is not valid.");
 
-        var productId = GetProductId();
+        var appId = GetAppId();
 
         try
         {
-            return await _professionalRepository.CreateProfessionalAsync(orgId, productId, request, cancellationToken);
+            return await _professionalRepository.CreateProfessionalAsync(orgId, appId, request, cancellationToken);
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             _logger.LogInformation(ex, "Duplicate professional email for orgId {OrgId}", orgId);
             throw new ProfessionalDuplicateEmailException(
-                "Professional with this email already exists for this organisation and product");
+                "Professional with this email already exists for this organisation and app");
         }
+    }
+
+    public async Task<CreateProfessionalResponse> UpdateProfessionalAsync(
+        int orgId,
+        int employeeId,
+        UpdateProfessionalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+        if (request is null)
+            throw new ArgumentNullException(nameof(request));
+
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            throw new ArgumentException("Full name is required.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
+            throw new ArgumentException("Email is not valid.");
+
+        var appId = GetAppId();
+
+        try
+        {
+            return await _professionalRepository.UpdateProfessionalAsync(orgId, appId, employeeId, request, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            _logger.LogInformation(ex, "Duplicate professional email on update for orgId {OrgId}", orgId);
+            throw new ProfessionalDuplicateEmailException(
+                "Professional with this email already exists for this organisation and app");
+        }
+    }
+
+    public async Task<CreateProfessionalResponse> DeactivateProfessionalAsync(
+        int orgId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+
+        var appId = GetAppId();
+        return await _professionalRepository.DeactivateProfessionalAsync(orgId, appId, employeeId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<BranchDto>> GetBranchesAsync(
@@ -92,8 +137,8 @@ public sealed class ProfessionalService : IProfessionalService
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
-        var productId = GetProductId();
-        return await _professionalRepository.GetBranchesAsync(orgId, productId, cancellationToken);
+        var appId = GetAppId();
+        return await _professionalRepository.GetBranchesAsync(orgId, appId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<DepartmentDto>> GetDepartmentsAsync(
@@ -102,8 +147,8 @@ public sealed class ProfessionalService : IProfessionalService
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
-        var productId = GetProductId();
-        return await _professionalRepository.GetDepartmentsAsync(orgId, productId, branchId, cancellationToken);
+        var appId = GetAppId();
+        return await _professionalRepository.GetDepartmentsAsync(orgId, appId, branchId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ProfessionalRoleDto>> GetRolesAsync(
@@ -112,16 +157,21 @@ public sealed class ProfessionalService : IProfessionalService
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
-        var productId = GetProductId();
-        return await _professionalRepository.GetRolesAsync(orgId, productId, branchId, cancellationToken);
+        var appId = GetAppId();
+        return await _professionalRepository.GetRolesAsync(orgId, appId, branchId, cancellationToken);
     }
 
-    private int GetProductId()
+    /// <summary>
+    /// SOC app id for Appointment (public.app_id). Prefers Appointment:AppId; falls back to ProductId.
+    /// </summary>
+    private int GetAppId()
     {
-        var productId = _configuration.GetValue<int?>("Appointment:ProductId") ?? 0;
-        if (productId <= 0)
-            throw new InvalidOperationException("Appointment:ProductId is not configured.");
-        return productId;
+        var appId = _configuration.GetValue<int?>("Appointment:AppId")
+                    ?? _configuration.GetValue<int?>("Appointment:ProductId")
+                    ?? 0;
+        if (appId <= 0)
+            throw new InvalidOperationException("Appointment:AppId (or ProductId) is not configured.");
+        return appId;
     }
 
     private static void ValidateOrg(int orgId)

@@ -223,6 +223,74 @@ public sealed class ProfessionalController : ControllerBase
         }
     }
 
+    /// <summary>PUT api/professionals/{employeeId}</summary>
+    [HttpPut("{employeeId:int}")]
+    public async Task<IActionResult> UpdateProfessionalAsync(
+        int employeeId,
+        [FromBody] UpdateProfessionalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        if (request is null)
+            return BadRequest(new { message = "Request body is required." });
+
+        try
+        {
+            var result = await _professionalService.UpdateProfessionalAsync(orgId, employeeId, request, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ProfessionalDuplicateEmailException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Update professional failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in PUT api/professionals/{EmployeeId}", employeeId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update professional." });
+        }
+    }
+
+    /// <summary>DELETE api/professionals/{employeeId} — sets status inactive</summary>
+    [HttpDelete("{employeeId:int}")]
+    public async Task<IActionResult> DeactivateProfessionalAsync(
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _professionalService.DeactivateProfessionalAsync(orgId, employeeId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Deactivate professional failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE api/professionals/{EmployeeId}", employeeId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to deactivate professional." });
+        }
+    }
+
     private bool TryGetAuthContext(out int userId, out int orgId)
     {
         userId = 0;

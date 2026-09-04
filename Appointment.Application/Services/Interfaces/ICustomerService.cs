@@ -21,6 +21,17 @@ public interface ICustomerService
         CreateCustomerRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<CreateCustomerResponse> UpdateCustomerAsync(
+        int orgId,
+        int accountId,
+        UpdateCustomerRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<DeactivateCustomerResponse> DeactivateCustomerAsync(
+        int orgId,
+        int accountId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AccountTypeDto>> GetAccountTypesAsync(
         int orgId,
         CancellationToken cancellationToken = default);
