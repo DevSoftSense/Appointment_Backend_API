@@ -155,6 +155,15 @@ public sealed class CustomerService : ICustomerService
         return await _customerRepository.GetAccountTypesForCustomerAsync(orgId, appId, cancellationToken);
     }
 
+    public async Task<CustomerStatsDto> GetCustomerStatsAsync(
+        int orgId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        var appId = GetAppId();
+        return await _customerRepository.GetCustomerStatsAsync(orgId, appId, cancellationToken);
+    }
+
     /// <summary>
     /// SOC app id for Appointment (public.app_id). Prefers Appointment:AppId; falls back to ProductId.
     /// </summary>

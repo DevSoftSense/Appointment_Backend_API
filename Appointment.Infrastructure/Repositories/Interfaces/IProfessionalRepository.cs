@@ -36,6 +36,50 @@ public interface IProfessionalRepository
         int employeeId,
         CancellationToken cancellationToken = default);
 
+    Task<ProfessionalStatsDto> GetProfessionalStatsAsync(
+        int orgId,
+        int appId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProfessionalServiceItemDto>> ListProfessionalServicesAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProfessionalServiceItemDto>> GetAvailableServicesAsync(
+        int orgId,
+        int appId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProfessionalServiceItemDto>> SetProfessionalServicesAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        IEnumerable<int> productIds,
+        CancellationToken cancellationToken = default);
+
+    Task<ProfessionalScheduleDto> GetScheduleAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProfessionalScheduleDto> SaveScheduleAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<ProfessionalScheduleGridDto> GetScheduleGridAsync(
+        int orgId,
+        int appId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        IEnumerable<int> employeeIds,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<BranchDto>> GetBranchesAsync(
         int orgId,
         int appId,

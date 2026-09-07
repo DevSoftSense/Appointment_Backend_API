@@ -9,8 +9,14 @@ public sealed class CreateCustomerRequest
     public string? Email { get; set; }
     public string? PhoneMobile { get; set; }
     public string? PhoneMobileAlt { get; set; }
+    public string? PhoneWork { get; set; }
     public string? Gender { get; set; }
     public DateOnly? DateOfBirth { get; set; }
+    public DateOnly? AnniversaryDate { get; set; }
+    public string? AcquisitionSource { get; set; }
+    public DateOnly? CustomerSince { get; set; }
+    public string? PreferredLanguage { get; set; }
+    public string? CompanyName { get; set; }
     public int? AccountTypeId { get; set; }
     public int? BranchId { get; set; }
     public string? PartyType { get; set; }

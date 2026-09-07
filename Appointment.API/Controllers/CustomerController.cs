@@ -22,11 +22,12 @@ public sealed class CustomerController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>GET api/customers?search=&amp;status=&amp;limit=&amp;offset=</summary>
+    /// <summary>GET api/customers?search=&amp;status=&amp;accountTypeId=&amp;limit=&amp;offset=</summary>
     [HttpGet]
     public async Task<IActionResult> GetCustomersAsync(
         [FromQuery] string? search,
         [FromQuery] string? status,
+        [FromQuery] int? accountTypeId,
         [FromQuery] int limit = 50,
         [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
@@ -44,6 +45,7 @@ public sealed class CustomerController : ControllerBase
                 {
                     Search = search,
                     Status = status,
+                    AccountTypeId = accountTypeId,
                     Limit = limit,
                     Offset = offset
                 },
@@ -92,6 +94,34 @@ public sealed class CustomerController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in GET api/customers/account-types");
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load account types." });
+        }
+    }
+
+    /// <summary>GET api/customers/stats</summary>
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetCustomerStatsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _customerService.GetCustomerStatsAsync(orgId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Customer stats failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/customers/stats");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load customer stats." });
         }
     }
 

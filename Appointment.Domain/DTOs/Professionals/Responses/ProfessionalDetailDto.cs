@@ -20,6 +20,7 @@ public sealed class ProfessionalDetailDto
     public string? RoleName { get; set; }
     public int? FiscalYearId { get; set; }
     public string? Status { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTimeOffset? CreatedOn { get; set; }
     public DateTimeOffset? UpdatedOn { get; set; }
 }

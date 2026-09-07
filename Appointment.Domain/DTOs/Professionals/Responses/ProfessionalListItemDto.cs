@@ -9,6 +9,8 @@ public sealed class ProfessionalListItemDto
     public string? Phone { get; set; }
     public string? Gender { get; set; }
     public DateOnly? DateOfBirth { get; set; }
+    public DateOnly? JoinDate { get; set; }
+    public string? Address { get; set; }
     public int BranchId { get; set; }
     public string? BranchName { get; set; }
     public int? DepartmentId { get; set; }

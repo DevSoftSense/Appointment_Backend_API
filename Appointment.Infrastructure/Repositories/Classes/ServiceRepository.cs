@@ -10,10 +10,12 @@ using NpgsqlTypes;
 namespace Appointment.Infrastructure.Repositories.Classes;
 
 /// <summary>
-/// Calls appointment.fn_appointment_* on SOC_SaaS_Product. No inline table SQL.
+/// Calls appointment.fn_appointment_service(p_action, …) on SOC_SaaS_Product. No inline table SQL.
 /// </summary>
 public sealed class ServiceRepository : IServiceRepository
 {
+    private const string Fn = "appointment.fn_appointment_service";
+
     private readonly ProductDatabaseHelper _db;
     private readonly ILogger<ServiceRepository> _logger;
 
@@ -33,26 +35,29 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
-                "appointment.fn_appointment_get_services",
-                Int(orgId),
-                Int(appId),
-                Varchar(request.Search),
-                Bool(request.IsActive),
-                Int(request.Limit),
-                Int(request.Offset));
+            var json = await CallAsync(
+                "list",
+                orgId,
+                appId,
+                search: request.Search,
+                isActive: request.IsActive,
+                limit: request.Limit,
+                offset: request.Offset);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return [];
 
             return JsonSerializer.Deserialize<List<ServiceListItemDto>>(json, PostgresJsonOptions.Options)
                    ?? [];
         }
         catch (PostgresException ex)
         {
-            _logger.LogError(ex, "PostgreSQL error in fn_appointment_get_services for orgId {OrgId}", orgId);
+            _logger.LogError(ex, "PostgreSQL error in {Fn} list for orgId {OrgId}", Fn, orgId);
             throw;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize fn_appointment_get_services for orgId {OrgId}", orgId);
+            _logger.LogError(ex, "Failed to deserialize {Fn} list for orgId {OrgId}", Fn, orgId);
             throw new InvalidOperationException("Service list response could not be parsed.", ex);
         }
     }
@@ -67,11 +72,7 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
-                "appointment.fn_appointment_get_service_by_id",
-                Int(orgId),
-                Int(appId),
-                Int(productId));
+            var json = await CallAsync("get_by_id", orgId, appId, productId: productId);
 
             if (string.IsNullOrWhiteSpace(json) || json == "null")
                 return null;
@@ -80,12 +81,12 @@ public sealed class ServiceRepository : IServiceRepository
         }
         catch (PostgresException ex)
         {
-            _logger.LogError(ex, "PostgreSQL error in fn_appointment_get_service_by_id for productId {ProductId}", productId);
+            _logger.LogError(ex, "PostgreSQL error in {Fn} get_by_id for productId {ProductId}", Fn, productId);
             throw;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize fn_appointment_get_service_by_id for productId {ProductId}", productId);
+            _logger.LogError(ex, "Failed to deserialize {Fn} get_by_id for productId {ProductId}", Fn, productId);
             throw new InvalidOperationException("Service response could not be parsed.", ex);
         }
     }
@@ -100,29 +101,29 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
-                "appointment.fn_appointment_create_service",
-                Int(orgId),
-                Int(appId),
-                NullableInt(request.FiscalYearId),
-                Varchar(request.ProductName),
-                NullableInt(request.CategoryId),
-                Numeric(request.SellingPrice),
-                NullableInt(request.DurationMinutes),
-                Text(request.SalesDescription),
-                Bool(request.IsActive ?? true));
+            var json = await CallAsync(
+                "create",
+                orgId,
+                appId,
+                fiscalYearId: request.FiscalYearId,
+                productName: request.ProductName,
+                categoryId: request.CategoryId,
+                sellingPrice: request.SellingPrice,
+                durationMinutes: request.DurationMinutes,
+                salesDescription: request.SalesDescription,
+                setIsActive: request.IsActive ?? true);
 
             return JsonSerializer.Deserialize<CreateServiceResponse>(json, PostgresJsonOptions.Options)
-                   ?? throw new InvalidOperationException("fn_appointment_create_service returned no data");
+                   ?? throw new InvalidOperationException($"{Fn} create returned no data");
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_create_service for orgId {OrgId}", orgId);
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} create for orgId {OrgId}", Fn, orgId);
             throw;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize fn_appointment_create_service for orgId {OrgId}", orgId);
+            _logger.LogError(ex, "Failed to deserialize {Fn} create for orgId {OrgId}", Fn, orgId);
             throw new InvalidOperationException("Create service response could not be parsed.", ex);
         }
     }
@@ -138,29 +139,29 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
-                "appointment.fn_appointment_update_service",
-                Int(orgId),
-                Int(appId),
-                Int(productId),
-                Varchar(request.ProductName),
-                NullableInt(request.CategoryId),
-                Numeric(request.SellingPrice),
-                NullableInt(request.DurationMinutes),
-                Text(request.SalesDescription),
-                Bool(request.IsActive));
+            var json = await CallAsync(
+                "update",
+                orgId,
+                appId,
+                productId: productId,
+                productName: request.ProductName,
+                categoryId: request.CategoryId,
+                sellingPrice: request.SellingPrice,
+                durationMinutes: request.DurationMinutes,
+                salesDescription: request.SalesDescription,
+                setIsActive: request.IsActive);
 
             return JsonSerializer.Deserialize<CreateServiceResponse>(json, PostgresJsonOptions.Options)
-                   ?? throw new InvalidOperationException("fn_appointment_update_service returned no data");
+                   ?? throw new InvalidOperationException($"{Fn} update returned no data");
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_update_service for productId {ProductId}", productId);
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} update for productId {ProductId}", Fn, productId);
             throw;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize fn_appointment_update_service for productId {ProductId}", productId);
+            _logger.LogError(ex, "Failed to deserialize {Fn} update for productId {ProductId}", Fn, productId);
             throw new InvalidOperationException("Update service response could not be parsed.", ex);
         }
     }
@@ -175,23 +176,19 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteSingleRowTableFunctionAsJsonAsync(
-                "appointment.fn_appointment_deactivate_service",
-                Int(orgId),
-                Int(appId),
-                Int(productId));
+            var json = await CallAsync("deactivate", orgId, appId, productId: productId);
 
             return JsonSerializer.Deserialize<CreateServiceResponse>(json, PostgresJsonOptions.Options)
-                   ?? throw new InvalidOperationException("fn_appointment_deactivate_service returned no data");
+                   ?? throw new InvalidOperationException($"{Fn} deactivate returned no data");
         }
         catch (PostgresException ex)
         {
-            _logger.LogWarning(ex, "PostgreSQL error in fn_appointment_deactivate_service for productId {ProductId}", productId);
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} deactivate for productId {ProductId}", Fn, productId);
             throw;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize fn_appointment_deactivate_service for productId {ProductId}", productId);
+            _logger.LogError(ex, "Failed to deserialize {Fn} deactivate for productId {ProductId}", Fn, productId);
             throw new InvalidOperationException("Deactivate service response could not be parsed.", ex);
         }
     }
@@ -205,16 +202,14 @@ public sealed class ServiceRepository : IServiceRepository
 
         try
         {
-            var json = await _db.ExecuteTableFunctionAsJsonArrayAsync(
-                "appointment.fn_appointment_get_service_categories",
-                Int(orgId),
-                Int(appId));
-
+            var json = await CallAsync("categories", orgId, appId);
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return [];
             return JsonSerializer.Deserialize<List<ServiceCategoryDto>>(json, PostgresJsonOptions.Options) ?? [];
         }
         catch (PostgresException ex)
         {
-            _logger.LogError(ex, "PostgreSQL error in fn_appointment_get_service_categories for orgId {OrgId}", orgId);
+            _logger.LogError(ex, "PostgreSQL error in {Fn} categories for orgId {OrgId}", Fn, orgId);
             throw;
         }
         catch (JsonException ex)
@@ -223,6 +218,40 @@ public sealed class ServiceRepository : IServiceRepository
             throw new InvalidOperationException("Category list could not be parsed.", ex);
         }
     }
+
+    private Task<string> CallAsync(
+        string action,
+        int orgId,
+        int appId,
+        int? productId = null,
+        string? search = null,
+        bool? isActive = null,
+        int? limit = null,
+        int? offset = null,
+        int? fiscalYearId = null,
+        string? productName = null,
+        int? categoryId = null,
+        decimal? sellingPrice = null,
+        int? durationMinutes = null,
+        string? salesDescription = null,
+        bool? setIsActive = null) =>
+        _db.ExecuteJsonFunctionAsync(
+            Fn,
+            Varchar(action),
+            Int(orgId),
+            Int(appId),
+            NullableInt(productId),
+            Varchar(search),
+            Bool(isActive),
+            NullableInt(limit),
+            NullableInt(offset),
+            NullableInt(fiscalYearId),
+            Varchar(productName),
+            NullableInt(categoryId),
+            Numeric(sellingPrice),
+            NullableInt(durationMinutes),
+            Text(salesDescription),
+            Bool(setIsActive));
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };

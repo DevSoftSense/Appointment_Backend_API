@@ -35,4 +35,8 @@ public interface ICustomerService
     Task<IReadOnlyList<AccountTypeDto>> GetAccountTypesAsync(
         int orgId,
         CancellationToken cancellationToken = default);
+
+    Task<CustomerStatsDto> GetCustomerStatsAsync(
+        int orgId,
+        CancellationToken cancellationToken = default);
 }

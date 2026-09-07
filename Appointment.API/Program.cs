@@ -73,6 +73,10 @@ builder.Services.AddScoped<IProfessionalService, ProfessionalService>();
 builder.Services.AddScoped<IServiceRepository, ServiceRepository>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 
+// ─── Appointment booking DI ───────────────────────────────────────────────────
+builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+
 // ─── JWT authentication ───────────────────────────────────────────────────────
 var jwtKey      = builder.Configuration["Jwt:Key"]      ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "Appointment.API";

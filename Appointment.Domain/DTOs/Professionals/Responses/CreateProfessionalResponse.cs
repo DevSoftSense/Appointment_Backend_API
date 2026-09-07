@@ -6,4 +6,5 @@ public sealed class CreateProfessionalResponse
     public string? EmployeeCode { get; set; }
     public string? FullName { get; set; }
     public string? Status { get; set; }
+    public bool IsDeleted { get; set; }
 }

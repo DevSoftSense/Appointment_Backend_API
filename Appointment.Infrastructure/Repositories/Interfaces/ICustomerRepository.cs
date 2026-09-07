@@ -41,4 +41,9 @@ public interface ICustomerRepository
         int orgId,
         int appId,
         CancellationToken cancellationToken = default);
+
+    Task<CustomerStatsDto> GetCustomerStatsAsync(
+        int orgId,
+        int appId,
+        CancellationToken cancellationToken = default);
 }

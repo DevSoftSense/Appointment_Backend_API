@@ -23,6 +23,44 @@ public sealed class ProductDatabaseHelper
         _logger = logger;
     }
 
+    /// <summary>
+    /// Calls a PostgreSQL function that already returns JSONB/JSON (e.g. unified module fn with p_action).
+    /// </summary>
+    public async Task<string> ExecuteJsonFunctionAsync(
+        string functionName,
+        params NpgsqlParameter[] parameters)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
+        ValidateFunctionName(functionName);
+
+        var sql = BuildJsonFunctionSql(functionName, parameters.Length);
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            await using var command = new NpgsqlCommand(sql, connection);
+            if (parameters.Length > 0)
+                command.Parameters.AddRange(parameters);
+
+            var result = await command.ExecuteScalarAsync();
+            return result is null or DBNull ? "null" : result.ToString() ?? "null";
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex,
+                "PostgreSQL error executing JSON function {FunctionName}. SqlState={SqlState}",
+                functionName, ex.SqlState);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error executing JSON function {FunctionName}", functionName);
+            throw;
+        }
+    }
+
     public async Task<string> ExecuteSingleRowTableFunctionAsJsonAsync(
         string functionName,
         params NpgsqlParameter[] parameters)
@@ -91,6 +129,15 @@ public sealed class ProductDatabaseHelper
             _logger.LogError(ex, "Unexpected error executing function {FunctionName}", functionName);
             throw;
         }
+    }
+
+    private static string BuildJsonFunctionSql(string functionName, int paramCount)
+    {
+        var sb = new StringBuilder();
+        sb.Append("SELECT ").Append(functionName).Append('(');
+        AppendPositionalParams(sb, paramCount);
+        sb.Append(")::text");
+        return sb.ToString();
     }
 
     private static string BuildSingleRowTableFunctionToJsonSql(string functionName, int paramCount)

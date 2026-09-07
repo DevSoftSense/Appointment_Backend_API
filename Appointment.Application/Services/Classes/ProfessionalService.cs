@@ -132,6 +132,106 @@ public sealed class ProfessionalService : IProfessionalService
         return await _professionalRepository.DeactivateProfessionalAsync(orgId, appId, employeeId, cancellationToken);
     }
 
+    public async Task<ProfessionalStatsDto> GetProfessionalStatsAsync(
+        int orgId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        var appId = GetAppId();
+        return await _professionalRepository.GetProfessionalStatsAsync(orgId, appId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProfessionalServiceItemDto>> ListProfessionalServicesAsync(
+        int orgId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+
+        var appId = GetAppId();
+        return await _professionalRepository.ListProfessionalServicesAsync(orgId, appId, employeeId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProfessionalServiceItemDto>> GetAvailableServicesAsync(
+        int orgId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        var appId = GetAppId();
+        return await _professionalRepository.GetAvailableServicesAsync(orgId, appId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProfessionalServiceItemDto>> SetProfessionalServicesAsync(
+        int orgId,
+        int employeeId,
+        IEnumerable<int> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+
+        var appId = GetAppId();
+        return await _professionalRepository.SetProfessionalServicesAsync(
+            orgId, appId, employeeId, productIds ?? [], cancellationToken);
+    }
+
+    public async Task<ProfessionalScheduleDto> GetScheduleAsync(
+        int orgId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+
+        var appId = GetAppId();
+        return await _professionalRepository.GetScheduleAsync(orgId, appId, employeeId, cancellationToken);
+    }
+
+    public async Task<ProfessionalScheduleDto> SaveScheduleAsync(
+        int orgId,
+        int employeeId,
+        SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.ConsultDurationMinutes <= 0)
+            throw new ArgumentException("Consult duration must be greater than 0.", nameof(request));
+        if (request.BufferMinutes < 0)
+            throw new ArgumentException("Buffer minutes cannot be negative.", nameof(request));
+
+        var appId = GetAppId();
+        return await _professionalRepository.SaveScheduleAsync(orgId, appId, employeeId, request, cancellationToken);
+    }
+
+    public async Task<ProfessionalScheduleGridDto> GetScheduleGridAsync(
+        int orgId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        IEnumerable<int>? employeeIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (toDate < fromDate)
+            throw new ArgumentException("toDate must be on or after fromDate.");
+        if (toDate.DayNumber - fromDate.DayNumber > 62)
+            throw new ArgumentException("Date range cannot exceed 62 days.");
+
+        var ids = (employeeIds ?? []).Where(id => id > 0).Distinct().ToList();
+        if (ids.Count == 0)
+            throw new ArgumentException("At least one employee id is required.");
+
+        var appId = GetAppId();
+        return await _professionalRepository.GetScheduleGridAsync(orgId, appId, fromDate, toDate, ids, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<BranchDto>> GetBranchesAsync(
         int orgId,
         CancellationToken cancellationToken = default)
