@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using Appointment.API.Helpers;
 using Appointment.Application.Services.Classes;
 using Appointment.Application.Services.Interfaces;
 using Appointment.Infrastructure.Data;
@@ -20,7 +19,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
-// ─── Swagger with JWT bearer ──────────────────────────────────────────────────
+// ─── Swagger with SoftOnCloud JWT bearer ──────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -37,7 +36,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme       = "Bearer",
         BearerFormat = "JWT",
         In           = ParameterLocation.Header,
-        Description  = "Enter your JWT token. Example: Bearer {token}"
+        Description  = "SoftOnCloud JWT from POST https://api.softoncloud.com/api/auth/login. Example: Bearer {token}"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -52,14 +51,20 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ─── Infrastructure helpers ───────────────────────────────────────────────────
-builder.Services.AddScoped<MasterDatabaseHelper>();
-builder.Services.AddScoped<ProductDatabaseHelper>();
-builder.Services.AddScoped<IJwtTokenHelper, JwtTokenHelper>();
+// ─── SoftOnCloud HTTP client (product-connection, etc.) ───────────────────────
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient("SoftOnCloud", client =>
+{
+    var baseUrl = builder.Configuration["SoftOnCloud:ApiBaseUrl"] ?? "https://api.softoncloud.com";
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+});
 
-// ─── Auth DI registrations ────────────────────────────────────────────────────
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
-builder.Services.AddScoped<IAuthService,    AuthService>();
+builder.Services.AddScoped<ITenantConnectionFactory, SoftOnCloudTenantConnectionFactory>();
+
+// ─── Infrastructure helpers ───────────────────────────────────────────────────
+// Product DB connection comes from SoftOnCloud product-connection (via factory).
+builder.Services.AddScoped<ProductDatabaseHelper>();
 
 // ─── Customer DI registrations ────────────────────────────────────────────────
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -77,10 +82,17 @@ builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
-// ─── JWT authentication ───────────────────────────────────────────────────────
-var jwtKey      = builder.Configuration["Jwt:Key"]      ?? throw new InvalidOperationException("Jwt:Key is not configured.");
-var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "Appointment.API";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "Appointment.API.Users";
+// ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
+var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
+                ?? throw new InvalidOperationException("SoftOnCloud:Jwt:Secret is not configured.");
+var jwtIssuer = builder.Configuration["SoftOnCloud:Jwt:Issuer"] ?? "SoftOnCloud";
+var jwtAudience = builder.Configuration["SoftOnCloud:Jwt:Audience"] ?? "SoftOnCloud";
+
+if (string.Equals(jwtSecret, "REPLACE_WITH_SOFTONCLOUD_JWT_SECRET", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException(
+        "SoftOnCloud:Jwt:Secret is still the placeholder. Ask SoftOnCloud platform for the JWT signing secret.");
+}
 
 builder.Services.AddAuthentication(options =>
 {
@@ -96,7 +108,7 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer              = jwtIssuer,
         ValidAudience            = jwtAudience,
-        IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
         ClockSkew                = TimeSpan.FromMinutes(1)
     };
 
@@ -132,7 +144,10 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
-startupLogger.LogInformation("Appointment API starting. Environment={Environment}", app.Environment.EnvironmentName);
+startupLogger.LogInformation(
+    "Appointment API starting. Environment={Environment}; SoftOnCloud={SoftOnCloudBase}",
+    app.Environment.EnvironmentName,
+    builder.Configuration["SoftOnCloud:ApiBaseUrl"]);
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>

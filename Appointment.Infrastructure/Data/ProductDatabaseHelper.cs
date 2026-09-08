@@ -1,25 +1,34 @@
-using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Appointment.Infrastructure.Repositories.Interfaces;
 using Npgsql;
+using System.Text;
 
 namespace Appointment.Infrastructure.Data;
 
 /// <summary>
-/// Executes PostgreSQL functions on SOC_SaaS_Product (SecondConnection).
-/// Appointment module repositories call this — no business DTOs here.
+/// Executes PostgreSQL functions on the organisation product transaction DB.
+/// <para>
+/// SoftOnCloud:UseProductConnectionDb = true  → SoftOnCloud GET /api/auth/product-connection (live routing)
+/// SoftOnCloud:UseProductConnectionDb = false → local SecondConnection (dev until functions are on live)
+/// </para>
 /// </summary>
 public sealed class ProductDatabaseHelper
 {
-    private readonly string _connectionString;
+    private readonly ITenantConnectionFactory _tenantConnections;
+    private readonly bool _useProductConnectionApi;
+    private readonly string? _localConnectionString;
     private readonly ILogger<ProductDatabaseHelper> _logger;
 
-    public ProductDatabaseHelper(IConfiguration configuration, ILogger<ProductDatabaseHelper> logger)
+    public ProductDatabaseHelper(
+        ITenantConnectionFactory tenantConnections,
+        IConfiguration configuration,
+        ILogger<ProductDatabaseHelper> logger)
     {
-        _connectionString = configuration.GetConnectionString("SecondConnection")
-            ?? configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException(
-                "Connection string 'SecondConnection' (or 'DefaultConnection') is not configured.");
+        _tenantConnections = tenantConnections;
+        _useProductConnectionApi = configuration.GetValue<bool>("SoftOnCloud:UseProductConnectionDb");
+        _localConnectionString = configuration.GetConnectionString("SecondConnection")
+                                 ?? configuration.GetConnectionString("DefaultConnection");
         _logger = logger;
     }
 
@@ -37,9 +46,7 @@ public sealed class ProductDatabaseHelper
 
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
+            await using var connection = await OpenConnectionAsync();
             await using var command = new NpgsqlCommand(sql, connection);
             if (parameters.Length > 0)
                 command.Parameters.AddRange(parameters);
@@ -72,9 +79,7 @@ public sealed class ProductDatabaseHelper
 
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
+            await using var connection = await OpenConnectionAsync();
             await using var command = new NpgsqlCommand(sql, connection);
             if (parameters.Length > 0)
                 command.Parameters.AddRange(parameters);
@@ -107,9 +112,7 @@ public sealed class ProductDatabaseHelper
 
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
+            await using var connection = await OpenConnectionAsync();
             await using var command = new NpgsqlCommand(sql, connection);
             if (parameters.Length > 0)
                 command.Parameters.AddRange(parameters);
@@ -129,6 +132,48 @@ public sealed class ProductDatabaseHelper
             _logger.LogError(ex, "Unexpected error executing function {FunctionName}", functionName);
             throw;
         }
+    }
+
+    private async Task<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var connectionString = await ResolveConnectionStringAsync(cancellationToken);
+        var connection = new NpgsqlConnection(connectionString);
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
+    private async Task<string> ResolveConnectionStringAsync(CancellationToken cancellationToken)
+    {
+        // Local/dev: functions live on local SOC_SaaS_Product until deployed to SoftOnCloud live.
+        if (!_useProductConnectionApi)
+        {
+            if (string.IsNullOrWhiteSpace(_localConnectionString))
+            {
+                throw new InvalidOperationException(
+                    "SoftOnCloud:UseProductConnectionDb is false, but ConnectionStrings:SecondConnection is not set. " +
+                    "Add your local product DB connection string.");
+            }
+
+            return _localConnectionString;
+        }
+
+        // Live/production path: SoftOnCloud product-connection API only.
+        var connectionString = await _tenantConnections.GetResolvedConnectionAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "SoftOnCloud product-connection returned an empty connection string.");
+        }
+
+        return connectionString;
     }
 
     private static string BuildJsonFunctionSql(string functionName, int paramCount)

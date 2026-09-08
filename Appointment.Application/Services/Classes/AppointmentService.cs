@@ -87,6 +87,8 @@ public sealed class AppointmentService : IAppointmentService
             throw new ArgumentException("Service is required.");
         if (request.StartDatetime == default)
             throw new ArgumentException("Start date/time is required.");
+        if (request.StartDatetime < DateTimeOffset.UtcNow)
+            throw new ArgumentException("Cannot book an appointment in the past. Choose a future time.");
         if (request.EndDatetime.HasValue && request.EndDatetime.Value <= request.StartDatetime)
             throw new ArgumentException("End time must be after start time.");
 
@@ -115,6 +117,8 @@ public sealed class AppointmentService : IAppointmentService
             && request.EndDatetime.HasValue
             && request.EndDatetime.Value <= request.StartDatetime.Value)
             throw new ArgumentException("End time must be after start time.");
+        // Past starts are blocked in SQL when the start actually changes; keep-window edits of an
+        // already-past booking are allowed so notes/status can still be updated.
 
         var appId = GetAppId();
         return await _appointmentRepository.UpdateAppointmentAsync(
