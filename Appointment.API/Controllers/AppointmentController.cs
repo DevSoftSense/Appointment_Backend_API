@@ -13,11 +13,16 @@ namespace Appointment.API.Controllers;
 public sealed class AppointmentController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
+    private readonly IAppointmentDocumentService _documentService;
     private readonly ILogger<AppointmentController> _logger;
 
-    public AppointmentController(IAppointmentService appointmentService, ILogger<AppointmentController> logger)
+    public AppointmentController(
+        IAppointmentService appointmentService,
+        IAppointmentDocumentService documentService,
+        ILogger<AppointmentController> logger)
     {
         _appointmentService = appointmentService;
+        _documentService = documentService;
         _logger = logger;
     }
 
@@ -306,6 +311,101 @@ public sealed class AppointmentController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in POST api/appointments/{AppointmentId}/complete", appointmentId);
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to complete appointment." });
+        }
+    }
+
+    /// <summary>GET api/appointments/{appointmentId}/documents</summary>
+    [HttpGet("{appointmentId:long}/documents")]
+    public async Task<IActionResult> ListDocumentsAsync(
+        long appointmentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var items = await _documentService.ListAsync(orgId, appointmentId, cancellationToken);
+            return Ok(items);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Document list failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET documents for appointment {AppointmentId}", appointmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load documents." });
+        }
+    }
+
+    /// <summary>POST api/appointments/{appointmentId}/documents — multipart form: file, optional documentType</summary>
+    [HttpPost("{appointmentId:long}/documents")]
+    [RequestSizeLimit(3 * 1024 * 1024)]
+    public async Task<IActionResult> UploadDocumentAsync(
+        long appointmentId,
+        IFormFile? file,
+        [FromForm] string? documentType,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out var userId, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var created = await _documentService.UploadAsync(
+                orgId, userId, appointmentId, file!, documentType, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Document upload failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST documents for appointment {AppointmentId}", appointmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to upload document." });
+        }
+    }
+
+    /// <summary>DELETE api/appointments/{appointmentId}/documents/{documentId}</summary>
+    [HttpDelete("{appointmentId:long}/documents/{documentId:long}")]
+    public async Task<IActionResult> DeleteDocumentAsync(
+        long appointmentId,
+        long documentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            await _documentService.DeleteAsync(orgId, appointmentId, documentId, cancellationToken);
+            return Ok(new { deleted = true, documentId });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Document delete failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE document {DocumentId}", documentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to delete document." });
         }
     }
 

@@ -24,6 +24,7 @@
     <Folder Include="Middleware\" />
     <Folder Include="Helpers\" />
     <Folder Include="Controllers\" />
+    <Folder Include="wwwroot\Uploads\Cust_Document\" />
   </ItemGroup>
 
 </Project>

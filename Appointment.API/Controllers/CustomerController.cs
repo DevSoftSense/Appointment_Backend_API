@@ -14,11 +14,16 @@ namespace Appointment.API.Controllers;
 public sealed class CustomerController : ControllerBase
 {
     private readonly ICustomerService _customerService;
+    private readonly IAppointmentDocumentService _documentService;
     private readonly ILogger<CustomerController> _logger;
 
-    public CustomerController(ICustomerService customerService, ILogger<CustomerController> logger)
+    public CustomerController(
+        ICustomerService customerService,
+        IAppointmentDocumentService documentService,
+        ILogger<CustomerController> logger)
     {
         _customerService = customerService;
+        _documentService = documentService;
         _logger = logger;
     }
 
@@ -155,6 +160,40 @@ public sealed class CustomerController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in GET api/customers/{AccountId}", accountId);
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load customer." });
+        }
+    }
+
+    /// <summary>GET api/customers/{accountId}/documents — docs from all of this customer's appointments</summary>
+    [HttpGet("{accountId:int}/documents")]
+    public async Task<IActionResult> ListCustomerDocumentsAsync(
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var customer = await _customerService.GetCustomerByIdAsync(orgId, accountId, cancellationToken);
+            if (customer is null)
+                return NotFound(new { message = "Customer not found." });
+
+            var items = await _documentService.ListByCustomerAsync(orgId, accountId, cancellationToken);
+            return Ok(items);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Customer documents list failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/customers/{AccountId}/documents", accountId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load documents." });
         }
     }
 

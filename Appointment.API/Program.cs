@@ -81,6 +81,8 @@ builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 // ─── Appointment booking DI ───────────────────────────────────────────────────
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<IAppointmentDocumentRepository, AppointmentDocumentRepository>();
+builder.Services.AddScoped<IAppointmentDocumentService, AppointmentDocumentService>();
 
 // ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
 var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
@@ -158,6 +160,10 @@ app.UseSwaggerUI(options =>
 
 app.UseRouting();
 app.UseCors("AppointmentCors");
+
+// Serve uploaded appointment documents from wwwroot/Uploads/...
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
