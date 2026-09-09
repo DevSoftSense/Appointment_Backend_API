@@ -22,11 +22,12 @@ public sealed class ProfessionalController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>GET api/professionals?search=&amp;status=&amp;limit=&amp;offset=</summary>
+    /// <summary>GET api/professionals?search=&amp;status=&amp;productId=&amp;limit=&amp;offset=</summary>
     [HttpGet]
     public async Task<IActionResult> GetProfessionalsAsync(
         [FromQuery] string? search,
         [FromQuery] string? status,
+        [FromQuery] int? productId,
         [FromQuery] int limit = 50,
         [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
@@ -42,6 +43,7 @@ public sealed class ProfessionalController : ControllerBase
                 {
                     Search = search,
                     Status = status,
+                    ProductId = productId,
                     Limit = limit,
                     Offset = offset
                 },

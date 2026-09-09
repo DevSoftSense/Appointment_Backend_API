@@ -42,7 +42,8 @@ public sealed class ProfessionalRepository : IProfessionalRepository
                 search: request.Search,
                 status: request.Status,
                 limit: request.Limit,
-                offset: request.Offset);
+                offset: request.Offset,
+                productIds: request.ProductId is > 0 ? request.ProductId.Value.ToString() : null);
 
             if (string.IsNullOrWhiteSpace(json) || json == "null")
                 return [];

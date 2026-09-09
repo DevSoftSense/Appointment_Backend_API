@@ -84,6 +84,10 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IAppointmentDocumentRepository, AppointmentDocumentRepository>();
 builder.Services.AddScoped<IAppointmentDocumentService, AppointmentDocumentService>();
 
+// ─── Queue / Check-In DI ──────────────────────────────────────────────────────
+builder.Services.AddScoped<IQueueRepository, QueueRepository>();
+builder.Services.AddScoped<IQueueService, QueueService>();
+
 // ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
 var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
                 ?? throw new InvalidOperationException("SoftOnCloud:Jwt:Secret is not configured.");
