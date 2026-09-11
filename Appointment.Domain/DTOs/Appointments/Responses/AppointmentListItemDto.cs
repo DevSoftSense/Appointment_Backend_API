@@ -17,6 +17,8 @@ public sealed class AppointmentListItemDto
     public long? BranchId { get; set; }
     public string? BranchName { get; set; }
     public long? CabinResourceId { get; set; }
+    public string? CabinName { get; set; }
+    public string? CabinCode { get; set; }
     public DateOnly? AppointmentDate { get; set; }
     public DateTimeOffset StartDatetime { get; set; }
     public DateTimeOffset EndDatetime { get; set; }
