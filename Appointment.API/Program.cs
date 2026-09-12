@@ -96,6 +96,10 @@ builder.Services.AddScoped<ICabinService, CabinService>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
+// ─── Settings DI ──────────────────────────────────────────────────────────────
+builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
+builder.Services.AddScoped<ISettingsService, SettingsService>();
+
 // ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
 var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
                 ?? throw new InvalidOperationException("SoftOnCloud:Jwt:Secret is not configured.");
