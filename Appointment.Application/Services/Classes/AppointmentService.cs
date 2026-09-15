@@ -10,15 +10,18 @@ namespace Appointment.Application.Services.Classes;
 public sealed class AppointmentService : IAppointmentService
 {
     private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IReminderService _reminderService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AppointmentService> _logger;
 
     public AppointmentService(
         IAppointmentRepository appointmentRepository,
+        IReminderService reminderService,
         IConfiguration configuration,
         ILogger<AppointmentService> logger)
     {
         _appointmentRepository = appointmentRepository;
+        _reminderService = reminderService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -97,8 +100,11 @@ public sealed class AppointmentService : IAppointmentService
             "Creating appointment org={OrgId} customer={CustomerId} professional={ProfessionalId} product={ProductId}",
             orgId, request.CustomerId, request.ProfessionalId, request.ProductId);
 
-        return await _appointmentRepository.CreateAppointmentAsync(
+        var created = await _appointmentRepository.CreateAppointmentAsync(
             orgId, appId, createdBy, request, cancellationToken);
+
+        await _reminderService.SyncForAppointmentAsync(orgId, created.AppointmentId, createdBy, cancellationToken);
+        return created;
     }
 
     public async Task<AppointmentDetailDto> UpdateAppointmentAsync(
@@ -121,8 +127,11 @@ public sealed class AppointmentService : IAppointmentService
         // already-past booking are allowed so notes/status can still be updated.
 
         var appId = GetAppId();
-        return await _appointmentRepository.UpdateAppointmentAsync(
+        var updated = await _appointmentRepository.UpdateAppointmentAsync(
             orgId, appId, appointmentId, updatedBy > 0 ? updatedBy : null, request, cancellationToken);
+
+        await _reminderService.SyncForAppointmentAsync(orgId, updated.AppointmentId, updatedBy, cancellationToken);
+        return updated;
     }
 
     public async Task<AppointmentDetailDto> CancelAppointmentAsync(
@@ -138,8 +147,11 @@ public sealed class AppointmentService : IAppointmentService
 
         request ??= new CancelAppointmentRequest();
         var appId = GetAppId();
-        return await _appointmentRepository.CancelAppointmentAsync(
+        var cancelled = await _appointmentRepository.CancelAppointmentAsync(
             orgId, appId, appointmentId, updatedBy > 0 ? updatedBy : null, request, cancellationToken);
+
+        await _reminderService.CancelForAppointmentAsync(orgId, appointmentId, cancellationToken);
+        return cancelled;
     }
 
     public async Task<AppointmentDetailDto> CheckInAppointmentAsync(

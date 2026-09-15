@@ -13,11 +13,16 @@ namespace Appointment.API.Controllers;
 public sealed class SettingsController : ControllerBase
 {
     private readonly ISettingsService _settingsService;
+    private readonly IAutoNoShowService _autoNoShowService;
     private readonly ILogger<SettingsController> _logger;
 
-    public SettingsController(ISettingsService settingsService, ILogger<SettingsController> logger)
+    public SettingsController(
+        ISettingsService settingsService,
+        IAutoNoShowService autoNoShowService,
+        ILogger<SettingsController> logger)
     {
         _settingsService = settingsService;
+        _autoNoShowService = autoNoShowService;
         _logger = logger;
     }
 
@@ -233,6 +238,29 @@ public sealed class SettingsController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in PUT api/settings/appointment-rules");
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to save appointment rules." });
+        }
+    }
+
+    /// <summary>Optional manual kick for smoke tests (current org only; worker sweeps all orgs).</summary>
+    [HttpPost("auto-no-show/sweep")]
+    public async Task<IActionResult> SweepAutoNoShowAsync(CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _autoNoShowService.SweepAsync(orgId, cancellationToken));
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Auto no-show sweep failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/settings/auto-no-show/sweep");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to run auto no-show sweep." });
         }
     }
 

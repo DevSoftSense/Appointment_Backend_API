@@ -100,6 +100,16 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 
+// ─── Reminders (email queue on public.tab_notifications) ──────────────────────
+builder.Services.AddScoped<IReminderRepository, ReminderRepository>();
+builder.Services.AddScoped<IReminderService, ReminderService>();
+builder.Services.AddScoped<Appointment.Infrastructure.Email.ISmtpEmailSender, Appointment.Infrastructure.Email.SmtpEmailSender>();
+builder.Services.AddHostedService<Appointment.API.Workers.ReminderEmailWorker>();
+
+builder.Services.AddScoped<IAutoNoShowRepository, AutoNoShowRepository>();
+builder.Services.AddScoped<IAutoNoShowService, AutoNoShowService>();
+builder.Services.AddHostedService<Appointment.API.Workers.AutoNoShowWorker>();
+
 // ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
 var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
                 ?? throw new InvalidOperationException("SoftOnCloud:Jwt:Secret is not configured.");

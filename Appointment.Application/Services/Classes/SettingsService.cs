@@ -15,7 +15,8 @@ public sealed class SettingsService : ISettingsService
         "room_type",
         "appointment_type",
         "appointment_source",
-        "cancel_reason"
+        "cancel_reason",
+        "reminder_offset"
     };
 
     private readonly ISettingsRepository _settingsRepository;
@@ -124,7 +125,7 @@ public sealed class SettingsService : ISettingsService
     private static void ValidateKind(string? kind)
     {
         if (string.IsNullOrWhiteSpace(kind) || !AllowedKinds.Contains(kind.Trim()))
-            throw new ArgumentException("Valid lookup kind is required (room_type, appointment_type, appointment_source, cancel_reason).");
+            throw new ArgumentException("Valid lookup kind is required (room_type, appointment_type, appointment_source, cancel_reason, reminder_offset).");
     }
 
     private int GetAppId()
