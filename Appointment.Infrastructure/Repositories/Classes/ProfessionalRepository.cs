@@ -326,13 +326,27 @@ public sealed class ProfessionalRepository : IProfessionalRepository
         int orgId,
         int appId,
         int employeeId,
+        DateOnly? asOfDate = null,
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
 
         try
         {
-            var json = await CallAsync("get_schedule", orgId, appId, employeeId: employeeId);
+            string? scheduleJson = null;
+            if (asOfDate.HasValue)
+            {
+                scheduleJson = JsonSerializer.Serialize(
+                    new { asOfDate = asOfDate.Value.ToString("yyyy-MM-dd") },
+                    PostgresJsonOptions.Options);
+            }
+
+            var json = await CallAsync(
+                "get_schedule",
+                orgId,
+                appId,
+                employeeId: employeeId,
+                scheduleJson: scheduleJson);
             if (string.IsNullOrWhiteSpace(json) || json == "null")
                 throw new InvalidOperationException("Schedule response was empty.");
 
@@ -348,6 +362,35 @@ public sealed class ProfessionalRepository : IProfessionalRepository
         {
             _logger.LogError(ex, "Failed to deserialize get_schedule for employeeId {EmployeeId}", employeeId);
             throw new InvalidOperationException("Professional schedule response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<ProfessionalScheduleVersionDto>> ListScheduleVersionsAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync("list_schedule_versions", orgId, appId, employeeId: employeeId);
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return [];
+
+            return JsonSerializer.Deserialize<List<ProfessionalScheduleVersionDto>>(json, PostgresJsonOptions.Options)
+                   ?? [];
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} list_schedule_versions for employeeId {EmployeeId}", Fn, employeeId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize list_schedule_versions for employeeId {EmployeeId}", employeeId);
+            throw new InvalidOperationException("Professional schedule versions response could not be parsed.", ex);
         }
     }
 
@@ -376,7 +419,8 @@ public sealed class ProfessionalRepository : IProfessionalRepository
                 consultDurationMinutes = request.ConsultDurationMinutes,
                 bufferMinutes = request.BufferMinutes,
                 timezone = request.Timezone,
-                effectiveFrom = request.EffectiveFrom?.ToString("yyyy-MM-dd")
+                effectiveFrom = request.EffectiveFrom?.ToString("yyyy-MM-dd"),
+                effectiveTo = request.EffectiveTo?.ToString("yyyy-MM-dd")
             };
 
             var scheduleJson = JsonSerializer.Serialize(payload, PostgresJsonOptions.Options);

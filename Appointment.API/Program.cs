@@ -96,6 +96,10 @@ builder.Services.AddScoped<ICabinService, CabinService>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
+// ─── Reports DI ───────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
+builder.Services.AddScoped<IReportsService, ReportsService>();
+
 // ─── Settings DI ──────────────────────────────────────────────────────────────
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();

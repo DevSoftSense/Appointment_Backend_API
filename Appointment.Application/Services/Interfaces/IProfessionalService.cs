@@ -53,6 +53,12 @@ public interface IProfessionalService
     Task<ProfessionalScheduleDto> GetScheduleAsync(
         int orgId,
         int employeeId,
+        DateOnly? asOfDate = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProfessionalScheduleVersionDto>> ListScheduleVersionsAsync(
+        int orgId,
+        int employeeId,
         CancellationToken cancellationToken = default);
 
     Task<ProfessionalScheduleDto> SaveScheduleAsync(

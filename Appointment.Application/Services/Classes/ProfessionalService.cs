@@ -181,6 +181,7 @@ public sealed class ProfessionalService : IProfessionalService
     public async Task<ProfessionalScheduleDto> GetScheduleAsync(
         int orgId,
         int employeeId,
+        DateOnly? asOfDate = null,
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
@@ -188,7 +189,20 @@ public sealed class ProfessionalService : IProfessionalService
             throw new ArgumentException("Professional id is required.", nameof(employeeId));
 
         var appId = GetAppId();
-        return await _professionalRepository.GetScheduleAsync(orgId, appId, employeeId, cancellationToken);
+        return await _professionalRepository.GetScheduleAsync(orgId, appId, employeeId, asOfDate, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProfessionalScheduleVersionDto>> ListScheduleVersionsAsync(
+        int orgId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+
+        var appId = GetAppId();
+        return await _professionalRepository.ListScheduleVersionsAsync(orgId, appId, employeeId, cancellationToken);
     }
 
     public async Task<ProfessionalScheduleDto> SaveScheduleAsync(
@@ -206,6 +220,12 @@ public sealed class ProfessionalService : IProfessionalService
             throw new ArgumentException("Consult duration must be greater than 0.", nameof(request));
         if (request.BufferMinutes < 0)
             throw new ArgumentException("Buffer minutes cannot be negative.", nameof(request));
+        if (request.EffectiveFrom.HasValue
+            && request.EffectiveTo.HasValue
+            && request.EffectiveTo.Value < request.EffectiveFrom.Value)
+        {
+            throw new ArgumentException("Effective To must be on or after Effective From.");
+        }
 
         var appId = GetAppId();
         return await _professionalRepository.SaveScheduleAsync(orgId, appId, employeeId, request, cancellationToken);

@@ -7,6 +7,9 @@ public sealed class ProfessionalScheduleDto
     public string? Timezone { get; set; }
     public int ConsultDurationMinutes { get; set; }
     public int BufferMinutes { get; set; }
+    public DateOnly? AsOfDate { get; set; }
+    public DateOnly? EffectiveFrom { get; set; }
+    public DateOnly? EffectiveTo { get; set; }
     public IReadOnlyList<ProfessionalScheduleDayDto> Days { get; set; } = [];
 }
 

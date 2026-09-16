@@ -249,10 +249,11 @@ public sealed class ProfessionalController : ControllerBase
         }
     }
 
-    /// <summary>GET api/professionals/{employeeId}/schedule</summary>
+    /// <summary>GET api/professionals/{employeeId}/schedule?asOfDate=YYYY-MM-DD</summary>
     [HttpGet("{employeeId:int}/schedule")]
     public async Task<IActionResult> GetScheduleAsync(
         int employeeId,
+        [FromQuery] DateOnly? asOfDate = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
@@ -260,7 +261,7 @@ public sealed class ProfessionalController : ControllerBase
 
         try
         {
-            var result = await _professionalService.GetScheduleAsync(orgId, employeeId, cancellationToken);
+            var result = await _professionalService.GetScheduleAsync(orgId, employeeId, asOfDate, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -276,6 +277,36 @@ public sealed class ProfessionalController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in GET api/professionals/{EmployeeId}/schedule", employeeId);
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load professional schedule." });
+        }
+    }
+
+    /// <summary>GET api/professionals/{employeeId}/schedule/versions</summary>
+    [HttpGet("{employeeId:int}/schedule/versions")]
+    public async Task<IActionResult> ListScheduleVersionsAsync(
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _professionalService.ListScheduleVersionsAsync(orgId, employeeId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "List professional schedule versions failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/professionals/{EmployeeId}/schedule/versions", employeeId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load schedule versions." });
         }
     }
 

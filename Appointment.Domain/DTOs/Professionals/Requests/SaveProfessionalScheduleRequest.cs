@@ -7,6 +7,8 @@ public sealed class SaveProfessionalScheduleRequest
     public int BufferMinutes { get; set; } = 15;
     public string? Timezone { get; set; }
     public DateOnly? EffectiveFrom { get; set; }
+    /// <summary>Optional end of this weekly pattern. Null = ongoing until a later version starts.</summary>
+    public DateOnly? EffectiveTo { get; set; }
 }
 
 public sealed class SaveProfessionalScheduleDayRequest
