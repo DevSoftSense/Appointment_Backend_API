@@ -29,4 +29,5 @@ public sealed class SaveAppointmentRulesRequest
 {
     public bool? AutoNoShowEnabled { get; set; }
     public int? AutoNoShowGraceMinutes { get; set; }
+    public int? BookingWindowMonths { get; set; }
 }

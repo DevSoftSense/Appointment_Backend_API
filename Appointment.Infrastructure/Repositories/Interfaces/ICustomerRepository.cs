@@ -17,6 +17,12 @@ public interface ICustomerRepository
         int accountId,
         CancellationToken cancellationToken = default);
 
+    Task<CustomerDetailDto?> FindCustomerByPhoneAsync(
+        int orgId,
+        int appId,
+        string phoneMobile,
+        CancellationToken cancellationToken = default);
+
     Task<CreateCustomerResponse> CreateCustomerAsync(
         int orgId,
         int appId,

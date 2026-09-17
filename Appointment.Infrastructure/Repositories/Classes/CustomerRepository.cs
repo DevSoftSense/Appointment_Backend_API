@@ -121,6 +121,39 @@ public sealed class CustomerRepository : ICustomerRepository
         }
     }
 
+    public async Task<CustomerDetailDto?> FindCustomerByPhoneAsync(
+        int orgId,
+        int appId,
+        string phoneMobile,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "find_by_phone",
+                orgId,
+                appId,
+                phoneMobile: phoneMobile);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return null;
+
+            return JsonSerializer.Deserialize<CustomerDetailDto>(json, PostgresJsonOptions.Options);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} find_by_phone for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize {Fn} find_by_phone for orgId {OrgId}", Fn, orgId);
+            throw new InvalidOperationException("Customer phone lookup response could not be parsed.", ex);
+        }
+    }
+
     public async Task<CreateCustomerResponse> CreateCustomerAsync(
         int orgId,
         int appId,

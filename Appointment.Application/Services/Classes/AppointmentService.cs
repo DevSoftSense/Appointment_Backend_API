@@ -1,3 +1,4 @@
+using Appointment.Application.Helpers;
 using Appointment.Application.Services.Interfaces;
 using Appointment.Domain.DTOs.Appointments.Requests;
 using Appointment.Domain.DTOs.Appointments.Responses;
@@ -11,17 +12,20 @@ public sealed class AppointmentService : IAppointmentService
 {
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IReminderService _reminderService;
+    private readonly ISettingsService _settingsService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AppointmentService> _logger;
 
     public AppointmentService(
         IAppointmentRepository appointmentRepository,
         IReminderService reminderService,
+        ISettingsService settingsService,
         IConfiguration configuration,
         ILogger<AppointmentService> logger)
     {
         _appointmentRepository = appointmentRepository;
         _reminderService = reminderService;
+        _settingsService = settingsService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -95,6 +99,13 @@ public sealed class AppointmentService : IAppointmentService
         if (request.EndDatetime.HasValue && request.EndDatetime.Value <= request.StartDatetime)
             throw new ArgumentException("End time must be after start time.");
 
+        var apptDate = BookingWindowHelper.ResolveAppointmentDate(
+            request.AppointmentDate, request.StartDatetime);
+        var rules = await _settingsService.GetRulesAsync(orgId, cancellationToken);
+        BookingWindowHelper.EnsureDateInWindow(
+            apptDate,
+            BookingWindowHelper.ClampMonths(rules.BookingWindowMonths));
+
         var appId = GetAppId();
         _logger.LogInformation(
             "Creating appointment org={OrgId} customer={CustomerId} professional={ProfessionalId} product={ProductId}",
@@ -127,6 +138,30 @@ public sealed class AppointmentService : IAppointmentService
         // already-past booking are allowed so notes/status can still be updated.
 
         var appId = GetAppId();
+        var existing = await _appointmentRepository.GetAppointmentByIdAsync(
+            orgId, appId, appointmentId, cancellationToken);
+        if (existing is null)
+            throw new ArgumentException("Appointment not found.");
+
+        // If staff changes the calendar date, new date must be inside advance booking window.
+        // Keeping the original date (even if now outside the window) is allowed.
+        if (request.StartDatetime.HasValue || request.AppointmentDate.HasValue)
+        {
+            var newDate = BookingWindowHelper.ResolveAppointmentDate(
+                request.AppointmentDate,
+                request.StartDatetime ?? existing.StartDatetime);
+            var oldDate = BookingWindowHelper.ResolveAppointmentDate(
+                existing.AppointmentDate,
+                existing.StartDatetime);
+            if (newDate != oldDate)
+            {
+                var rules = await _settingsService.GetRulesAsync(orgId, cancellationToken);
+                BookingWindowHelper.EnsureDateInWindow(
+                    newDate,
+                    BookingWindowHelper.ClampMonths(rules.BookingWindowMonths));
+            }
+        }
+
         var updated = await _appointmentRepository.UpdateAppointmentAsync(
             orgId, appId, appointmentId, updatedBy > 0 ? updatedBy : null, request, cancellationToken);
 

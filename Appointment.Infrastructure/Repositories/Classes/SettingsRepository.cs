@@ -193,6 +193,8 @@ public sealed class SettingsRepository : ISettingsRepository
                 payload["auto_no_show_enabled"] = request.AutoNoShowEnabled.Value;
             if (request.AutoNoShowGraceMinutes.HasValue)
                 payload["auto_no_show_grace_minutes"] = request.AutoNoShowGraceMinutes.Value;
+            if (request.BookingWindowMonths.HasValue)
+                payload["booking_window_months"] = request.BookingWindowMonths.Value;
 
             var rulesJson = JsonSerializer.Serialize(payload, PostgresJsonOptions.Options);
             var json = await CallAsync("set_rules", orgId, appId, rulesJson: rulesJson);

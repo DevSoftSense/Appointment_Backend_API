@@ -114,6 +114,10 @@ builder.Services.AddScoped<IAutoNoShowRepository, AutoNoShowRepository>();
 builder.Services.AddScoped<IAutoNoShowService, AutoNoShowService>();
 builder.Services.AddHostedService<Appointment.API.Workers.AutoNoShowWorker>();
 
+// ─── Public QR self-booking DI ────────────────────────────────────────────────
+builder.Services.AddScoped<IPublicBookingService, PublicBookingService>();
+builder.Services.AddSingleton<IPublicBookTokenService, PublicBookTokenService>();
+
 // ─── SoftOnCloud JWT validation (tokens issued by SoftOnCloud login API) ──────
 var jwtSecret = builder.Configuration["SoftOnCloud:Jwt:Secret"]
                 ?? throw new InvalidOperationException("SoftOnCloud:Jwt:Secret is not configured.");

@@ -26,4 +26,7 @@ public sealed class AppointmentRulesDto
 {
     public bool AutoNoShowEnabled { get; set; }
     public int AutoNoShowGraceMinutes { get; set; } = 10;
+
+    /// <summary>How many calendar months ahead (beyond current month) may be booked. 1–12; default 1.</summary>
+    public int BookingWindowMonths { get; set; } = 1;
 }

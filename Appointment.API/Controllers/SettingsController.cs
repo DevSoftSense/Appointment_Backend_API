@@ -1,5 +1,6 @@
 using Appointment.API.Helpers;
 using Appointment.Application.Services.Interfaces;
+using Appointment.Domain.DTOs.PublicBook.Responses;
 using Appointment.Domain.DTOs.Settings.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ public sealed class SettingsController : ControllerBase
 {
     private readonly ISettingsService _settingsService;
     private readonly IAutoNoShowService _autoNoShowService;
+    private readonly IPublicBookTokenService _tokenService;
     private readonly ILogger<SettingsController> _logger;
 
     public SettingsController(
         ISettingsService settingsService,
         IAutoNoShowService autoNoShowService,
+        IPublicBookTokenService tokenService,
         ILogger<SettingsController> logger)
     {
         _settingsService = settingsService;
         _autoNoShowService = autoNoShowService;
+        _tokenService = tokenService;
         _logger = logger;
     }
 
@@ -261,6 +265,29 @@ public sealed class SettingsController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in POST api/settings/auto-no-show/sweep");
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to run auto no-show sweep." });
+        }
+    }
+
+    /// <summary>GET api/settings/public-booking-link — encrypted QR token for this org (no raw org id in customer URL).</summary>
+    [HttpGet("public-booking-link")]
+    public IActionResult GetPublicBookingLink()
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var token = _tokenService.CreateToken(orgId);
+            return Ok(new PublicBookingLinkDto
+            {
+                Token = token,
+                BookingPath = $"/public/book?t={Uri.EscapeDataString(token)}",
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create public booking link for org {OrgId}", orgId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create booking link." });
         }
     }
 

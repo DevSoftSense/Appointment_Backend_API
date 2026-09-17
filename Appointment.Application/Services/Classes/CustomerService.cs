@@ -58,6 +58,20 @@ public sealed class CustomerService : ICustomerService
         return await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken);
     }
 
+    public async Task<CustomerDetailDto?> FindCustomerByPhoneAsync(
+        int orgId,
+        string phoneMobile,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (string.IsNullOrWhiteSpace(phoneMobile))
+            throw new ArgumentException("Phone number is required.", nameof(phoneMobile));
+
+        var appId = GetAppId();
+        return await _customerRepository.FindCustomerByPhoneAsync(
+            orgId, appId, phoneMobile.Trim(), cancellationToken);
+    }
+
     public async Task<CreateCustomerResponse> CreateCustomerAsync(
         int orgId,
         int createdBy,
