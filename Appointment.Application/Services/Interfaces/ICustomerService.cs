@@ -1,5 +1,6 @@
 using Appointment.Domain.DTOs.Customers.Requests;
 using Appointment.Domain.DTOs.Customers.Responses;
+using Microsoft.AspNetCore.Http;
 
 namespace Appointment.Application.Services.Interfaces;
 
@@ -43,5 +44,16 @@ public interface ICustomerService
 
     Task<CustomerStatsDto> GetCustomerStatsAsync(
         int orgId,
+        CancellationToken cancellationToken = default);
+
+    Task<CustomerDetailDto> UploadProfilePhotoAsync(
+        int orgId,
+        int accountId,
+        IFormFile file,
+        CancellationToken cancellationToken = default);
+
+    Task<CustomerDetailDto> ClearProfilePhotoAsync(
+        int orgId,
+        int accountId,
         CancellationToken cancellationToken = default);
 }

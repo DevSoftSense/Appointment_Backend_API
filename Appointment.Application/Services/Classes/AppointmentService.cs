@@ -219,6 +219,24 @@ public sealed class AppointmentService : IAppointmentService
             orgId, appId, appointmentId, updatedBy > 0 ? updatedBy : null, cancellationToken);
     }
 
+    public async Task<AppointmentDetailDto> MarkNoShowAsync(
+        int orgId,
+        long appointmentId,
+        long updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (appointmentId <= 0)
+            throw new ArgumentException("Appointment id is required.", nameof(appointmentId));
+
+        var appId = GetAppId();
+        var updated = await _appointmentRepository.MarkNoShowAsync(
+            orgId, appId, appointmentId, updatedBy > 0 ? updatedBy : null, cancellationToken);
+
+        await _reminderService.CancelForAppointmentAsync(orgId, appointmentId, cancellationToken);
+        return updated;
+    }
+
     private int GetAppId()
     {
         var appId = _configuration.GetValue<int?>("Appointment:AppId")

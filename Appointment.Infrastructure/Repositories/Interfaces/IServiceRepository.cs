@@ -39,5 +39,25 @@ public interface IServiceRepository
     Task<IReadOnlyList<ServiceCategoryDto>> GetCategoriesAsync(
         int orgId,
         int appId,
+        bool? isActive = true,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceCategoryDto> CreateCategoryAsync(
+        int orgId,
+        int appId,
+        SaveServiceCategoryRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceCategoryDto> UpdateCategoryAsync(
+        int orgId,
+        int appId,
+        int categoryId,
+        UpdateServiceCategoryRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<ServiceCategoryDto> DeactivateCategoryAsync(
+        int orgId,
+        int appId,
+        int categoryId,
         CancellationToken cancellationToken = default);
 }

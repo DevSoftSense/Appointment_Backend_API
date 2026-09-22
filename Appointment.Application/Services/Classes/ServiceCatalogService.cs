@@ -144,11 +144,68 @@ public sealed class ServiceCatalogService : IServiceCatalogService
 
     public async Task<IReadOnlyList<ServiceCategoryDto>> GetCategoriesAsync(
         int orgId,
+        bool? isActive = true,
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
         var appId = GetAppId();
-        return await _serviceRepository.GetCategoriesAsync(orgId, appId, cancellationToken);
+        return await _serviceRepository.GetCategoriesAsync(orgId, appId, isActive, cancellationToken);
+    }
+
+    public async Task<ServiceCategoryDto> CreateCategoryAsync(
+        int orgId,
+        SaveServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (request is null) throw new ArgumentNullException(nameof(request));
+        if (string.IsNullOrWhiteSpace(request.CategoryName))
+            throw new ArgumentException("Category name is required.");
+
+        var appId = GetAppId();
+        try
+        {
+            return await _serviceRepository.CreateCategoryAsync(orgId, appId, request, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new ArgumentException("A category with this name already exists.");
+        }
+    }
+
+    public async Task<ServiceCategoryDto> UpdateCategoryAsync(
+        int orgId,
+        int categoryId,
+        UpdateServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (categoryId <= 0) throw new ArgumentException("Category id is required.");
+        if (request is null) throw new ArgumentNullException(nameof(request));
+        if (string.IsNullOrWhiteSpace(request.CategoryName))
+            throw new ArgumentException("Category name is required.");
+
+        var appId = GetAppId();
+        try
+        {
+            return await _serviceRepository.UpdateCategoryAsync(orgId, appId, categoryId, request, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new ArgumentException("A category with this name already exists.");
+        }
+    }
+
+    public async Task<ServiceCategoryDto> DeactivateCategoryAsync(
+        int orgId,
+        int categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (categoryId <= 0) throw new ArgumentException("Category id is required.");
+
+        var appId = GetAppId();
+        return await _serviceRepository.DeactivateCategoryAsync(orgId, appId, categoryId, cancellationToken);
     }
 
     private int GetAppId()

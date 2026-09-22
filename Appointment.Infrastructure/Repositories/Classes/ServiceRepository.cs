@@ -196,13 +196,14 @@ public sealed class ServiceRepository : IServiceRepository
     public async Task<IReadOnlyList<ServiceCategoryDto>> GetCategoriesAsync(
         int orgId,
         int appId,
+        bool? isActive = true,
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
 
         try
         {
-            var json = await CallAsync("categories", orgId, appId);
+            var json = await CallAsync("categories", orgId, appId, isActive: isActive);
             if (string.IsNullOrWhiteSpace(json) || json == "null")
                 return [];
             return JsonSerializer.Deserialize<List<ServiceCategoryDto>>(json, PostgresJsonOptions.Options) ?? [];
@@ -216,6 +217,105 @@ public sealed class ServiceRepository : IServiceRepository
         {
             _logger.LogError(ex, "Failed to deserialize service categories for orgId {OrgId}", orgId);
             throw new InvalidOperationException("Category list could not be parsed.", ex);
+        }
+    }
+
+    public async Task<ServiceCategoryDto> CreateCategoryAsync(
+        int orgId,
+        int appId,
+        SaveServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "create_category",
+                orgId,
+                appId,
+                productName: request.CategoryName,
+                salesDescription: request.Description,
+                setIsActive: request.IsActive);
+
+            return JsonSerializer.Deserialize<ServiceCategoryDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Create category returned no data.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} create_category for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize create_category for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Create category response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<ServiceCategoryDto> UpdateCategoryAsync(
+        int orgId,
+        int appId,
+        int categoryId,
+        UpdateServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "update_category",
+                orgId,
+                appId,
+                categoryId: categoryId,
+                productName: request.CategoryName,
+                salesDescription: request.Description,
+                setIsActive: request.IsActive);
+
+            return JsonSerializer.Deserialize<ServiceCategoryDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Update category returned no data.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} update_category for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize update_category for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Update category response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<ServiceCategoryDto> DeactivateCategoryAsync(
+        int orgId,
+        int appId,
+        int categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "deactivate_category",
+                orgId,
+                appId,
+                categoryId: categoryId);
+
+            return JsonSerializer.Deserialize<ServiceCategoryDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Deactivate category returned no data.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} deactivate_category for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize deactivate_category for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Deactivate category response could not be parsed.", ex);
         }
     }
 

@@ -2,6 +2,7 @@ using Appointment.API.Helpers;
 using Appointment.Application.Services.Interfaces;
 using Appointment.Domain.DTOs.PublicBook.Requests;
 using Appointment.Domain.Exceptions;
+using Appointment.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -11,7 +12,8 @@ namespace Appointment.API.Controllers;
 /// <summary>
 /// Public QR self-booking APIs (no SoftOnCloud JWT).
 /// Organisation is taken from encrypted booking token <c>t</c> — never trust a raw org id from the client.
-/// Local/dev: SoftOnCloud:UseProductConnectionDb must be false (SecondConnection).
+/// Live DB: SoftOnCloud GET /api/auth/product-connection/service with X-Product-Service-Key
+/// (orgId from <c>t</c>). Local: SoftOnCloud:UseProductConnectionDb=false → SecondConnection.
 /// </summary>
 [AllowAnonymous]
 [ApiController]
@@ -20,15 +22,18 @@ public sealed class PublicBookController : ControllerBase
 {
     private readonly IPublicBookingService _publicBookingService;
     private readonly IPublicBookTokenService _tokenService;
+    private readonly IPublicBookOrgContext _publicBookOrg;
     private readonly ILogger<PublicBookController> _logger;
 
     public PublicBookController(
         IPublicBookingService publicBookingService,
         IPublicBookTokenService tokenService,
+        IPublicBookOrgContext publicBookOrg,
         ILogger<PublicBookController> logger)
     {
         _publicBookingService = publicBookingService;
         _tokenService = tokenService;
+        _publicBookOrg = publicBookOrg;
         _logger = logger;
     }
 
@@ -271,10 +276,14 @@ public sealed class PublicBookController : ControllerBase
     {
         orgId = 0;
         error = null;
-        if (_tokenService.TryResolve(token, out orgId))
-            return true;
+        if (!_tokenService.TryResolve(token, out orgId))
+        {
+            error = BadRequest(new { message = "Invalid or missing booking link. Ask the clinic for a new QR code." });
+            return false;
+        }
 
-        error = BadRequest(new { message = "Invalid or missing booking link. Ask the clinic for a new QR code." });
-        return false;
+        // So ProductDatabaseHelper can call SoftOnCloud product-connection/service for this org.
+        _publicBookOrg.OrgId = orgId;
+        return true;
     }
 }

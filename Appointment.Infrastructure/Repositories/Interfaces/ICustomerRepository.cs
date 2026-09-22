@@ -52,4 +52,11 @@ public interface ICustomerRepository
         int orgId,
         int appId,
         CancellationToken cancellationToken = default);
+
+    Task<CustomerDetailDto?> SetProfilePhotoAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        string? partyProfileRelativePath,
+        CancellationToken cancellationToken = default);
 }

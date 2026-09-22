@@ -27,6 +27,10 @@ public sealed class CustomerDetailDto
     public int? FiscalYearId { get; set; }
     public string? Status { get; set; }
     public string? Remarks { get; set; }
+    /// <summary>Relative path under wwwroot (e.g. Uploads/Customer_Photos/...).</summary>
+    public string? PartyProfile { get; set; }
+    /// <summary>Browser URL for the profile photo (set by service).</summary>
+    public string? ProfilePhotoUrl { get; set; }
     public DateTimeOffset? CreatedOn { get; set; }
     public int? CreatedBy { get; set; }
     public DateTime? ModifiedOn { get; set; }

@@ -86,13 +86,31 @@ public sealed class PublicBookingService : IPublicBookingService
         if (string.IsNullOrWhiteSpace(request.PhoneMobile))
             throw new ArgumentException("Mobile phone is required.");
 
+        var phoneDigits = new string(request.PhoneMobile.Trim().Where(char.IsDigit).ToArray());
+        // Strip leading country 91 if pasted as 91XXXXXXXXXX
+        if (phoneDigits.Length == 12 && phoneDigits.StartsWith("91", StringComparison.Ordinal))
+            phoneDigits = phoneDigits[2..];
+        if (phoneDigits.Length == 11 && phoneDigits.StartsWith('0'))
+            phoneDigits = phoneDigits[1..];
+        if (phoneDigits.Length != 10)
+            throw new ArgumentException("Mobile phone must be exactly 10 digits.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var email = request.Email.Trim();
+            if (!email.Contains('@') || email.IndexOf('@') != email.LastIndexOf('@')
+                || email.StartsWith('@') || email.EndsWith('@')
+                || !email.Contains('.'))
+                throw new ArgumentException("Enter a valid email address.");
+        }
+
         var createdBy = GetSystemUserId();
         var create = new CreateCustomerRequest
         {
             DisplayName = request.DisplayName,
             FirstName = request.FirstName,
             LastName = request.LastName,
-            PhoneMobile = request.PhoneMobile.Trim(),
+            PhoneMobile = phoneDigits,
             Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
             Gender = request.Gender,
             DateOfBirth = request.DateOfBirth,

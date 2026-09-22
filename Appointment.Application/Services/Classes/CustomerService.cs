@@ -3,6 +3,8 @@ using Appointment.Domain.DTOs.Customers.Requests;
 using Appointment.Domain.DTOs.Customers.Responses;
 using Appointment.Domain.Exceptions;
 using Appointment.Infrastructure.Repositories.Interfaces;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -11,16 +13,27 @@ namespace Appointment.Application.Services.Classes;
 
 public sealed class CustomerService : ICustomerService
 {
+    /// <summary>Max profile photo size (1 MB).</summary>
+    private const long ProfilePhotoMaxBytes = 1024L * 1024L;
+
+    private static readonly HashSet<string> PhotoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".webp"
+    };
+
     private readonly ICustomerRepository _customerRepository;
+    private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CustomerService> _logger;
 
     public CustomerService(
         ICustomerRepository customerRepository,
+        IWebHostEnvironment env,
         IConfiguration configuration,
         ILogger<CustomerService> logger)
     {
         _customerRepository = customerRepository;
+        _env = env;
         _configuration = configuration;
         _logger = logger;
     }
@@ -37,6 +50,8 @@ public sealed class CustomerService : ICustomerService
 
         var appId = GetAppId();
         var items = await _customerRepository.GetCustomersAsync(orgId, appId, request, cancellationToken);
+        foreach (var item in items)
+            AttachPhotoUrl(item);
 
         return new CustomerListResponse
         {
@@ -55,7 +70,9 @@ public sealed class CustomerService : ICustomerService
             throw new ArgumentException("Customer id is required.", nameof(accountId));
 
         var appId = GetAppId();
-        return await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken);
+        var customer = await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken);
+        AttachPhotoUrl(customer);
+        return customer;
     }
 
     public async Task<CustomerDetailDto?> FindCustomerByPhoneAsync(
@@ -68,8 +85,10 @@ public sealed class CustomerService : ICustomerService
             throw new ArgumentException("Phone number is required.", nameof(phoneMobile));
 
         var appId = GetAppId();
-        return await _customerRepository.FindCustomerByPhoneAsync(
+        var customer = await _customerRepository.FindCustomerByPhoneAsync(
             orgId, appId, phoneMobile.Trim(), cancellationToken);
+        AttachPhotoUrl(customer);
+        return customer;
     }
 
     public async Task<CreateCustomerResponse> CreateCustomerAsync(
@@ -178,9 +197,95 @@ public sealed class CustomerService : ICustomerService
         return await _customerRepository.GetCustomerStatsAsync(orgId, appId, cancellationToken);
     }
 
-    /// <summary>
-    /// SOC app id for Appointment (public.app_id). Prefers Appointment:AppId; falls back to ProductId.
-    /// </summary>
+    public async Task<CustomerDetailDto> UploadProfilePhotoAsync(
+        int orgId,
+        int accountId,
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (accountId <= 0)
+            throw new ArgumentException("Customer id is required.", nameof(accountId));
+        if (file is null || file.Length <= 0)
+            throw new ArgumentException("A non-empty image file is required.");
+        if (file.Length > ProfilePhotoMaxBytes)
+            throw new ArgumentException("Profile photo must be 1 MB or smaller.");
+
+        var ext = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(ext) || !PhotoExtensions.Contains(ext))
+            throw new ArgumentException("Only PNG, JPG, JPEG, GIF, or WEBP images are allowed.");
+
+        var appId = GetAppId();
+        var existing = await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken);
+        if (existing is null)
+            throw new ArgumentException("Customer not found.");
+
+        var relativeFolder = Path.Combine(
+            "Uploads", "Customer_Photos", orgId.ToString(), accountId.ToString());
+        var webRoot = string.IsNullOrWhiteSpace(_env.WebRootPath)
+            ? Path.Combine(_env.ContentRootPath, "wwwroot")
+            : _env.WebRootPath;
+        var physicalFolder = Path.Combine(webRoot, relativeFolder);
+        Directory.CreateDirectory(physicalFolder);
+
+        var storedName = $"profile_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{ext.ToLowerInvariant()}";
+        var physicalPath = Path.Combine(physicalFolder, storedName);
+        var relativePath = Path.Combine(relativeFolder, storedName).Replace('\\', '/');
+
+        await using (var stream = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
+
+        try
+        {
+            var saved = await _customerRepository.SetProfilePhotoAsync(
+                orgId, appId, accountId, relativePath, cancellationToken)
+                ?? throw new InvalidOperationException("Failed to save profile photo path.");
+
+            TryDeletePhysical(existing.PartyProfile, webRoot);
+
+            var updated = await _customerRepository.GetCustomerByIdAsync(
+                orgId, appId, accountId, cancellationToken) ?? saved;
+            AttachPhotoUrl(updated);
+            return updated;
+        }
+        catch
+        {
+            TryDeletePhysical(relativePath, webRoot);
+            throw;
+        }
+    }
+
+    public async Task<CustomerDetailDto> ClearProfilePhotoAsync(
+        int orgId,
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (accountId <= 0)
+            throw new ArgumentException("Customer id is required.", nameof(accountId));
+
+        var appId = GetAppId();
+        var existing = await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken);
+        if (existing is null)
+            throw new ArgumentException("Customer not found.");
+
+        await _customerRepository.SetProfilePhotoAsync(
+            orgId, appId, accountId, null, cancellationToken);
+
+        var webRoot = string.IsNullOrWhiteSpace(_env.WebRootPath)
+            ? Path.Combine(_env.ContentRootPath, "wwwroot")
+            : _env.WebRootPath;
+        TryDeletePhysical(existing.PartyProfile, webRoot);
+
+        var updated = await _customerRepository.GetCustomerByIdAsync(orgId, appId, accountId, cancellationToken)
+            ?? existing;
+        updated.PartyProfile = null;
+        AttachPhotoUrl(updated);
+        return updated;
+    }
+
     private int GetAppId()
     {
         var appId = _configuration.GetValue<int?>("Appointment:AppId")
@@ -195,5 +300,39 @@ public sealed class CustomerService : ICustomerService
     {
         if (orgId <= 0)
             throw new ArgumentException("Organisation ID is required.");
+    }
+
+    private static void AttachPhotoUrl(CustomerDetailDto? customer)
+    {
+        if (customer is null) return;
+        customer.ProfilePhotoUrl = ToPublicUrl(customer.PartyProfile);
+    }
+
+    private static void AttachPhotoUrl(CustomerListItemDto item)
+    {
+        item.ProfilePhotoUrl = ToPublicUrl(item.PartyProfile);
+    }
+
+    private static string ToPublicUrl(string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return string.Empty;
+        var path = relativePath.Replace('\\', '/').TrimStart('/');
+        return "/" + path;
+    }
+
+    private void TryDeletePhysical(string? relativePath, string webRoot)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return;
+        try
+        {
+            var physical = Path.Combine(webRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(physical))
+                File.Delete(physical);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not delete old customer photo {Path}", relativePath);
+        }
     }
 }

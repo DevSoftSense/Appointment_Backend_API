@@ -1,9 +1,11 @@
 using Appointment.API.Helpers;
 using Appointment.Application.Services.Interfaces;
+using Appointment.Domain.DTOs.OrgMasters.Requests;
 using Appointment.Domain.DTOs.PublicBook.Responses;
 using Appointment.Domain.DTOs.Settings.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 
 namespace Appointment.API.Controllers;
@@ -14,19 +16,25 @@ namespace Appointment.API.Controllers;
 public sealed class SettingsController : ControllerBase
 {
     private readonly ISettingsService _settingsService;
+    private readonly IOrgMastersService _orgMastersService;
     private readonly IAutoNoShowService _autoNoShowService;
     private readonly IPublicBookTokenService _tokenService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<SettingsController> _logger;
 
     public SettingsController(
         ISettingsService settingsService,
+        IOrgMastersService orgMastersService,
         IAutoNoShowService autoNoShowService,
         IPublicBookTokenService tokenService,
+        IConfiguration configuration,
         ILogger<SettingsController> logger)
     {
         _settingsService = settingsService;
+        _orgMastersService = orgMastersService;
         _autoNoShowService = autoNoShowService;
         _tokenService = tokenService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -268,6 +276,164 @@ public sealed class SettingsController : ControllerBase
         }
     }
 
+    /// <summary>GET api/settings/branches</summary>
+    [HttpGet("branches")]
+    public async Task<IActionResult> ListBranchesAsync(
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] int limit = 100,
+        [FromQuery] int offset = 0,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _orgMastersService.ListBranchesAsync(
+                orgId,
+                new GetBranchesRequest
+                {
+                    IncludeInactive = includeInactive,
+                    Limit = limit,
+                    Offset = offset
+                },
+                cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings branches list failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/settings/branches");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load branches." });
+        }
+    }
+
+    /// <summary>GET api/settings/branches/{branchId}</summary>
+    [HttpGet("branches/{branchId:int}")]
+    public async Task<IActionResult> GetBranchAsync(
+        int branchId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.GetBranchAsync(orgId, branchId, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings get branch failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/settings/branches/{BranchId}", branchId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load branch." });
+        }
+    }
+
+    /// <summary>POST api/settings/branches</summary>
+    [HttpPost("branches")]
+    public async Task<IActionResult> CreateBranchAsync(
+        [FromBody] SaveBranchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.CreateBranchAsync(orgId, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings create branch failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/settings/branches");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create branch." });
+        }
+    }
+
+    /// <summary>PUT api/settings/branches/{branchId}</summary>
+    [HttpPut("branches/{branchId:int}")]
+    public async Task<IActionResult> UpdateBranchAsync(
+        int branchId,
+        [FromBody] UpdateBranchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.UpdateBranchAsync(orgId, branchId, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings update branch failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in PUT api/settings/branches/{BranchId}", branchId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update branch." });
+        }
+    }
+
+    /// <summary>DELETE api/settings/branches/{branchId} — soft-delete</summary>
+    [HttpDelete("branches/{branchId:int}")]
+    public async Task<IActionResult> DeactivateBranchAsync(
+        int branchId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            await _orgMastersService.DeactivateBranchAsync(orgId, branchId, cancellationToken);
+            return Ok(new { branchId, deleted = true });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings deactivate branch failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE api/settings/branches/{BranchId}", branchId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to delete branch." });
+        }
+    }
+
     /// <summary>GET api/settings/public-booking-link — encrypted QR token for this org (no raw org id in customer URL).</summary>
     [HttpGet("public-booking-link")]
     public IActionResult GetPublicBookingLink()
@@ -278,10 +444,14 @@ public sealed class SettingsController : ControllerBase
         try
         {
             var token = _tokenService.CreateToken(orgId);
+            var path = $"/public/book?t={Uri.EscapeDataString(token)}";
+            var frontendBase = (_configuration["Appointment:FrontendBaseUrl"] ?? "https://appointment.softoncloud.com")
+                .TrimEnd('/');
             return Ok(new PublicBookingLinkDto
             {
                 Token = token,
-                BookingPath = $"/public/book?t={Uri.EscapeDataString(token)}",
+                BookingPath = path,
+                BookingUrl = $"{frontendBase}{path}",
             });
         }
         catch (Exception ex)

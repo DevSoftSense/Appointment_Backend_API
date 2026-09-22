@@ -52,6 +52,13 @@ public sealed class ReportsRepository : IReportsRepository
         CallAsync<ReportNoShowDto>("no_show", orgId, appId, fromDate, toDate, branchId, professionalId,
             cancellationToken: cancellationToken);
 
+    public Task<ReportCustomersDto> GetCustomersAsync(
+        int orgId, int appId, DateOnly fromDate, DateOnly toDate,
+        int? branchId, int? professionalId,
+        int limit, int offset, CancellationToken cancellationToken = default) =>
+        CallAsync<ReportCustomersDto>("customers", orgId, appId, fromDate, toDate, branchId, professionalId,
+            limit, offset, null, cancellationToken);
+
     private async Task<T> CallAsync<T>(
         string action,
         int orgId,

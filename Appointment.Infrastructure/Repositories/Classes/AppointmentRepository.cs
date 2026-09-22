@@ -356,6 +356,42 @@ public sealed class AppointmentRepository : IAppointmentRepository
         }
     }
 
+    public async Task<AppointmentDetailDto> MarkNoShowAsync(
+        int orgId,
+        int appId,
+        long appointmentId,
+        long? updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "no_show",
+                orgId,
+                appId,
+                appointmentId: appointmentId,
+                updatedBy: updatedBy);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                throw new InvalidOperationException("Mark no-show returned no data.");
+
+            return JsonSerializer.Deserialize<AppointmentDetailDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Mark no-show response could not be parsed.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} no_show for appointmentId {AppointmentId}", Fn, appointmentId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize {Fn} no_show for appointmentId {AppointmentId}", Fn, appointmentId);
+            throw new InvalidOperationException("Mark no-show response could not be parsed.", ex);
+        }
+    }
+
     private Task<string> CallAsync(
         string action,
         int orgId,

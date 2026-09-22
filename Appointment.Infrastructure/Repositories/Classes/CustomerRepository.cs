@@ -315,6 +315,41 @@ public sealed class CustomerRepository : ICustomerRepository
         }
     }
 
+    public async Task<CustomerDetailDto?> SetProfilePhotoAsync(
+        int orgId,
+        int appId,
+        int accountId,
+        string? partyProfileRelativePath,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var json = await CallAsync(
+                "set_profile_photo",
+                orgId,
+                appId,
+                accountId: accountId,
+                partyProfile: partyProfileRelativePath);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return null;
+
+            return JsonSerializer.Deserialize<CustomerDetailDto>(json, PostgresJsonOptions.Options);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} set_profile_photo for accountId {AccountId}", Fn, accountId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize {Fn} set_profile_photo for accountId {AccountId}", Fn, accountId);
+            throw new InvalidOperationException("Set profile photo response could not be parsed.", ex);
+        }
+    }
+
     private Task<string> CallAsync(
         string action,
         int orgId,
@@ -344,7 +379,8 @@ public sealed class CustomerRepository : ICustomerRepository
         DateOnly? anniversaryDate = null,
         DateOnly? customerSince = null,
         string? preferredLanguage = null,
-        string? companyName = null) =>
+        string? companyName = null,
+        string? partyProfile = null) =>
         _db.ExecuteJsonFunctionAsync(
             Fn,
             Varchar(action),
@@ -375,7 +411,8 @@ public sealed class CustomerRepository : ICustomerRepository
             Date(anniversaryDate),
             Date(customerSince),
             Varchar(preferredLanguage),
-            Varchar(companyName));
+            Varchar(companyName),
+            Varchar(partyProfile));
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };

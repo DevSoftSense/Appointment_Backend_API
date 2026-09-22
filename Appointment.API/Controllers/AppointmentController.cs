@@ -314,6 +314,37 @@ public sealed class AppointmentController : ControllerBase
         }
     }
 
+    /// <summary>POST api/appointments/{appointmentId}/no-show</summary>
+    [HttpPost("{appointmentId:long}/no-show")]
+    public async Task<IActionResult> MarkNoShowAsync(
+        long appointmentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out var userId, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _appointmentService.MarkNoShowAsync(
+                orgId, appointmentId, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Mark no-show failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/appointments/{AppointmentId}/no-show", appointmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to mark no-show." });
+        }
+    }
+
     /// <summary>GET api/appointments/{appointmentId}/documents</summary>
     [HttpGet("{appointmentId:long}/documents")]
     public async Task<IActionResult> ListDocumentsAsync(

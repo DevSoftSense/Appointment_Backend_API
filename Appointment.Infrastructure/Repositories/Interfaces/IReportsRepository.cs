@@ -24,4 +24,9 @@ public interface IReportsRepository
     Task<ReportNoShowDto> GetNoShowAsync(
         int orgId, int appId, DateOnly fromDate, DateOnly toDate,
         int? branchId, int? professionalId, CancellationToken cancellationToken = default);
+
+    Task<ReportCustomersDto> GetCustomersAsync(
+        int orgId, int appId, DateOnly fromDate, DateOnly toDate,
+        int? branchId, int? professionalId,
+        int limit, int offset, CancellationToken cancellationToken = default);
 }

@@ -70,6 +70,20 @@ public sealed class ReportsService : IReportsService
             orgId, appId, fromDate, toDate, branchId, professionalId, cancellationToken);
     }
 
+    public Task<ReportCustomersDto> GetCustomersAsync(
+        int orgId, DateOnly fromDate, DateOnly toDate,
+        int? branchId, int? professionalId,
+        int limit, int offset, CancellationToken cancellationToken = default)
+    {
+        Validate(orgId, fromDate, toDate);
+        if (limit <= 0) limit = 100;
+        if (limit > 500) limit = 500;
+        if (offset < 0) offset = 0;
+        var appId = GetAppId();
+        return _reportsRepository.GetCustomersAsync(
+            orgId, appId, fromDate, toDate, branchId, professionalId, limit, offset, cancellationToken);
+    }
+
     private int GetAppId()
     {
         var appId = _configuration.GetValue<int?>("Appointment:AppId")

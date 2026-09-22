@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Appointment.Infrastructure.Repositories.Interfaces;
@@ -9,26 +10,37 @@ namespace Appointment.Infrastructure.Data;
 /// <summary>
 /// Executes PostgreSQL functions on the organisation product transaction DB.
 /// <para>
-/// SoftOnCloud:UseProductConnectionDb = true  → SoftOnCloud GET /api/auth/product-connection (live routing)
-/// SoftOnCloud:UseProductConnectionDb = false → local SecondConnection (dev until functions are on live)
+/// SoftOnCloud:UseProductConnectionDb = false → local SecondConnection (dev)
+/// SoftOnCloud:UseProductConnectionDb = true  →
+///   staff JWT → GET /api/auth/product-connection;
+///   public QR (IPublicBookOrgContext) → GET /api/auth/product-connection/service + ProductServiceKey;
+///   workers / emergency → SecondConnection fallback
 /// </para>
 /// </summary>
 public sealed class ProductDatabaseHelper
 {
     private readonly ITenantConnectionFactory _tenantConnections;
+    private readonly IPublicBookOrgContext _publicBookOrg;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly bool _useProductConnectionApi;
     private readonly string? _localConnectionString;
+    private readonly string? _productServiceKey;
     private readonly ILogger<ProductDatabaseHelper> _logger;
 
     public ProductDatabaseHelper(
         ITenantConnectionFactory tenantConnections,
+        IPublicBookOrgContext publicBookOrg,
+        IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         ILogger<ProductDatabaseHelper> logger)
     {
         _tenantConnections = tenantConnections;
+        _publicBookOrg = publicBookOrg;
+        _httpContextAccessor = httpContextAccessor;
         _useProductConnectionApi = configuration.GetValue<bool>("SoftOnCloud:UseProductConnectionDb");
         _localConnectionString = configuration.GetConnectionString("SecondConnection")
                                  ?? configuration.GetConnectionString("DefaultConnection");
+        _productServiceKey = configuration["SoftOnCloud:ProductServiceKey"];
         _logger = logger;
     }
 
@@ -165,15 +177,63 @@ public sealed class ProductDatabaseHelper
             return _localConnectionString;
         }
 
-        // Live/production path: SoftOnCloud product-connection API only.
-        var connectionString = await _tenantConnections.GetResolvedConnectionAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(connectionString))
+        // Live: staff JWT → SoftOnCloud product-connection.
+        if (HasSoftOnCloudBearer())
         {
-            throw new InvalidOperationException(
-                "SoftOnCloud product-connection returned an empty connection string.");
+            var connectionString = await _tenantConnections.GetResolvedConnectionAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "SoftOnCloud product-connection returned an empty connection string.");
+            }
+
+            return connectionString;
         }
 
-        return connectionString;
+        // Live: public QR — org from decrypted token t + product service key (no staff JWT).
+        if (_publicBookOrg.OrgId is int publicOrgId && publicOrgId > 0
+            && !string.IsNullOrWhiteSpace(_productServiceKey))
+        {
+            var connectionString = await _tenantConnections.GetResolvedConnectionForServiceAsync(
+                publicOrgId,
+                cancellationToken);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "SoftOnCloud product-connection/service returned an empty connection string.");
+            }
+
+            return connectionString;
+        }
+
+        // Workers / emergency fallback (reminders, auto no-show) — no JWT and no public org context.
+        if (!string.IsNullOrWhiteSpace(_localConnectionString))
+        {
+            _logger.LogWarning(
+                "No SoftOnCloud JWT and no public-book org/service-key path; using ConnectionStrings:SecondConnection " +
+                "(expected for background workers). PublicOrgId={PublicOrgId} HasServiceKey={HasServiceKey}",
+                _publicBookOrg.OrgId,
+                !string.IsNullOrWhiteSpace(_productServiceKey));
+            return _localConnectionString;
+        }
+
+        if (_publicBookOrg.OrgId is > 0 && string.IsNullOrWhiteSpace(_productServiceKey))
+        {
+            throw new InvalidOperationException(
+                "Public QR booking requires SoftOnCloud:ProductServiceKey on the API server " +
+                "(value issued by SoftOnCloud for Appointment product-connection/service).");
+        }
+
+        throw new InvalidOperationException(
+            "Cannot resolve product DB: no SoftOnCloud JWT, no public-book org + ProductServiceKey, " +
+            "and ConnectionStrings:SecondConnection is not set.");
+    }
+
+    private bool HasSoftOnCloudBearer()
+    {
+        var authHeader = _httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
+        return !string.IsNullOrWhiteSpace(authHeader)
+               && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildJsonFunctionSql(string functionName, int paramCount)

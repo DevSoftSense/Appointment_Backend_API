@@ -65,16 +65,19 @@ public sealed class ServiceController : ControllerBase
         }
     }
 
-    /// <summary>GET api/services/categories</summary>
+    /// <summary>GET api/services/categories?includeInactive=</summary>
     [HttpGet("categories")]
-    public async Task<IActionResult> GetCategoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetCategoriesAsync(
+        [FromQuery] bool includeInactive = false,
+        CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
         try
         {
-            var result = await _serviceCatalogService.GetCategoriesAsync(orgId, cancellationToken);
+            bool? isActive = includeInactive ? null : true;
+            var result = await _serviceCatalogService.GetCategoriesAsync(orgId, isActive, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -90,6 +93,95 @@ public sealed class ServiceController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in GET api/services/categories");
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load categories." });
+        }
+    }
+
+    /// <summary>POST api/services/categories</summary>
+    [HttpPost("categories")]
+    public async Task<IActionResult> CreateCategoryAsync(
+        [FromBody] SaveServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var created = await _serviceCatalogService.CreateCategoryAsync(orgId, request, cancellationToken);
+            return Ok(created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Create category failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/services/categories");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create category." });
+        }
+    }
+
+    /// <summary>PUT api/services/categories/{categoryId}</summary>
+    [HttpPut("categories/{categoryId:int}")]
+    public async Task<IActionResult> UpdateCategoryAsync(
+        int categoryId,
+        [FromBody] UpdateServiceCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _serviceCatalogService.UpdateCategoryAsync(orgId, categoryId, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Update category failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in PUT api/services/categories/{CategoryId}", categoryId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update category." });
+        }
+    }
+
+    /// <summary>DELETE api/services/categories/{categoryId} — deactivate</summary>
+    [HttpDelete("categories/{categoryId:int}")]
+    public async Task<IActionResult> DeactivateCategoryAsync(
+        int categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _serviceCatalogService.DeactivateCategoryAsync(orgId, categoryId, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Deactivate category failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE api/services/categories/{CategoryId}", categoryId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to deactivate category." });
         }
     }
 

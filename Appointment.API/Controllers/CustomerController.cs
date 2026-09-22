@@ -302,6 +302,68 @@ public sealed class CustomerController : ControllerBase
         }
     }
 
+    /// <summary>POST api/customers/{accountId}/photo — profile image max 1 MB</summary>
+    [HttpPost("{accountId:int}/photo")]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    public async Task<IActionResult> UploadProfilePhotoAsync(
+        int accountId,
+        IFormFile? file,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _customerService.UploadProfilePhotoAsync(orgId, accountId, file!, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Upload customer photo failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/customers/{AccountId}/photo", accountId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to upload photo." });
+        }
+    }
+
+    /// <summary>DELETE api/customers/{accountId}/photo</summary>
+    [HttpDelete("{accountId:int}/photo")]
+    public async Task<IActionResult> ClearProfilePhotoAsync(
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _customerService.ClearProfilePhotoAsync(orgId, accountId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Clear customer photo failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE api/customers/{AccountId}/photo", accountId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to remove photo." });
+        }
+    }
+
     private bool TryGetAuthContext(out int userId, out int orgId)
     {
         userId = 0;

@@ -53,17 +53,21 @@ builder.Services.AddSwaggerGen(options =>
 
 // ─── SoftOnCloud HTTP client (product-connection, etc.) ───────────────────────
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("SoftOnCloud", client =>
 {
     var baseUrl = builder.Configuration["SoftOnCloud:ApiBaseUrl"] ?? "https://api.softoncloud.com";
     client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    // Avoid hanging staff/QR requests until the browser aborts (shows as fake CORS / ERR_FAILED).
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
 builder.Services.AddScoped<ITenantConnectionFactory, SoftOnCloudTenantConnectionFactory>();
+builder.Services.AddScoped<IPublicBookOrgContext, PublicBookOrgContext>();
 
 // ─── Infrastructure helpers ───────────────────────────────────────────────────
-// Product DB connection comes from SoftOnCloud product-connection (via factory).
+// Product DB: SoftOnCloud product-connection (JWT staff) or /service (QR) or local SecondConnection.
 builder.Services.AddScoped<ProductDatabaseHelper>();
 
 // ─── Customer DI registrations ────────────────────────────────────────────────
@@ -99,16 +103,21 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 // ─── Reports DI ───────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
+builder.Services.AddScoped<IReportScheduleRepository, ReportScheduleRepository>();
+builder.Services.AddScoped<IReportScheduleService, ReportScheduleService>();
 
 // ─── Settings DI ──────────────────────────────────────────────────────────────
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<IOrgMastersRepository, OrgMastersRepository>();
+builder.Services.AddScoped<IOrgMastersService, OrgMastersService>();
 
 // ─── Reminders (email queue on public.tab_notifications) ──────────────────────
 builder.Services.AddScoped<IReminderRepository, ReminderRepository>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<Appointment.Infrastructure.Email.ISmtpEmailSender, Appointment.Infrastructure.Email.SmtpEmailSender>();
 builder.Services.AddHostedService<Appointment.API.Workers.ReminderEmailWorker>();
+builder.Services.AddHostedService<Appointment.API.Workers.ReportScheduleEmailWorker>();
 
 builder.Services.AddScoped<IAutoNoShowRepository, AutoNoShowRepository>();
 builder.Services.AddScoped<IAutoNoShowService, AutoNoShowService>();
@@ -161,14 +170,18 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+// ─── CORS (origins only here — not duplicated in appsettings) ─────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AppointmentCors", policy =>
     {
         policy.WithOrigins(
                 "http://localhost:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "https://appointment.softoncloud.com",
+                "http://appointment.softoncloud.com",
+                "https://www.appointment.softoncloud.com",
+                "http://www.appointment.softoncloud.com"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -181,9 +194,39 @@ var app = builder.Build();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
 startupLogger.LogInformation(
-    "Appointment API starting. Environment={Environment}; SoftOnCloud={SoftOnCloudBase}",
+    "Appointment API starting. Environment={Environment}; SoftOnCloud={SoftOnCloudBase}; Frontend={Frontend}",
     app.Environment.EnvironmentName,
-    builder.Configuration["SoftOnCloud:ApiBaseUrl"]);
+    builder.Configuration["SoftOnCloud:ApiBaseUrl"],
+    builder.Configuration["Appointment:FrontendBaseUrl"]);
+
+// Always return JSON errors (with CORS) instead of empty/connection drops that the browser labels as CORS.
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("UnhandledException");
+        logger.LogError(ex, "Unhandled API exception Path={Path}", context.Request.Path);
+
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = ex switch
+        {
+            UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+            InvalidOperationException => StatusCodes.Status503ServiceUnavailable,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        var message = ex switch
+        {
+            UnauthorizedAccessException => "Your session has ended. Please sign in again.",
+            InvalidOperationException ioe => ioe.Message,
+            _ => "Unexpected server error. Please try again."
+        };
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(new { message }));
+    });
+});
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>

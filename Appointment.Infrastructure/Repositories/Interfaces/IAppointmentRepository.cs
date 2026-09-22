@@ -60,4 +60,11 @@ public interface IAppointmentRepository
         long appointmentId,
         long? updatedBy,
         CancellationToken cancellationToken = default);
+
+    Task<AppointmentDetailDto> MarkNoShowAsync(
+        int orgId,
+        int appId,
+        long appointmentId,
+        long? updatedBy,
+        CancellationToken cancellationToken = default);
 }

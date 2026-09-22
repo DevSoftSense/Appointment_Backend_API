@@ -175,3 +175,60 @@ public sealed class ReportNoShowByDayDto
     public long NoShow { get; set; }
     public long Total { get; set; }
 }
+
+public sealed class ReportCustomersDto
+{
+    public DateOnly? FromDate { get; set; }
+    public DateOnly? ToDate { get; set; }
+    public ReportCustomersSummaryDto Summary { get; set; } = new();
+    public IReadOnlyList<ReportCustomerFrequencyDto> Frequency { get; set; } = [];
+    public long Total { get; set; }
+    public int Limit { get; set; }
+    public int Offset { get; set; }
+    public IReadOnlyList<ReportCustomerRowDto> Items { get; set; } = [];
+    public ReportCustomerDefinitionsDto Definitions { get; set; } = new();
+}
+
+public sealed class ReportCustomersSummaryDto
+{
+    public long CustomersWithVisits { get; set; }
+    public long NewCustomers { get; set; }
+    public long ReturningCustomers { get; set; }
+    public long TotalVisits { get; set; }
+    public decimal AvgVisits { get; set; }
+    public decimal CompletedBookingValue { get; set; }
+}
+
+public sealed class ReportCustomerFrequencyDto
+{
+    public int BucketOrder { get; set; }
+    public string? Bucket { get; set; }
+    public string? Label { get; set; }
+    public long Count { get; set; }
+}
+
+public sealed class ReportCustomerRowDto
+{
+    public int? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
+    public string? PartyCode { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public long Visits { get; set; }
+    public long Completed { get; set; }
+    public long NoShow { get; set; }
+    public long Cancelled { get; set; }
+    public decimal BookingValue { get; set; }
+    public string? FirstInPeriod { get; set; }
+    public string? LastInPeriod { get; set; }
+    public string? FirstAppointmentDate { get; set; }
+    public bool IsNew { get; set; }
+    public bool IsReturning { get; set; }
+    public string? Segment { get; set; }
+}
+
+public sealed class ReportCustomerDefinitionsDto
+{
+    public string? New { get; set; }
+    public string? Returning { get; set; }
+}

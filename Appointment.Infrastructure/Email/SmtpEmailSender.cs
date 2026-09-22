@@ -8,6 +8,15 @@ namespace Appointment.Infrastructure.Email;
 public interface ISmtpEmailSender
 {
     Task SendEmailAsync(string toEmail, string subject, string bodyHtml, CancellationToken cancellationToken = default);
+
+    Task SendEmailAsync(
+        string toEmail,
+        string subject,
+        string bodyHtml,
+        byte[]? attachmentBytes,
+        string? attachmentFileName,
+        string? attachmentContentType,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class SmtpEmailSender : ISmtpEmailSender
@@ -21,10 +30,17 @@ public sealed class SmtpEmailSender : ISmtpEmailSender
         _logger = logger;
     }
 
+    public Task SendEmailAsync(
+        string toEmail, string subject, string bodyHtml, CancellationToken cancellationToken = default) =>
+        SendEmailAsync(toEmail, subject, bodyHtml, null, null, null, cancellationToken);
+
     public async Task SendEmailAsync(
         string toEmail,
         string subject,
         string bodyHtml,
+        byte[]? attachmentBytes,
+        string? attachmentFileName,
+        string? attachmentContentType,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(toEmail))
@@ -48,18 +64,36 @@ public sealed class SmtpEmailSender : ISmtpEmailSender
 
         using var message = new MailMessage(fromEmail, toEmail.Trim())
         {
-            Subject = string.IsNullOrWhiteSpace(subject) ? "Appointment Reminder" : subject.Trim(),
+            Subject = string.IsNullOrWhiteSpace(subject) ? "SoftOnCloud Appointment" : subject.Trim(),
             Body = bodyHtml ?? "",
             IsBodyHtml = true
         };
 
-        using var smtp = new SmtpClient(smtpHost, smtpPort)
+        Attachment? attachment = null;
+        if (attachmentBytes is { Length: > 0 } && !string.IsNullOrWhiteSpace(attachmentFileName))
         {
-            EnableSsl = enableSsl,
-            Credentials = new NetworkCredential(smtpUser, smtpPass)
-        };
+            var stream = new MemoryStream(attachmentBytes);
+            attachment = new Attachment(
+                stream,
+                attachmentFileName,
+                string.IsNullOrWhiteSpace(attachmentContentType) ? "application/octet-stream" : attachmentContentType);
+            message.Attachments.Add(attachment);
+        }
 
-        await Task.Run(() => smtp.Send(message), cancellationToken);
-        _logger.LogInformation("Reminder email sent to {To}", toEmail);
+        try
+        {
+            using var smtp = new SmtpClient(smtpHost, smtpPort)
+            {
+                EnableSsl = enableSsl,
+                Credentials = new NetworkCredential(smtpUser, smtpPass)
+            };
+
+            await Task.Run(() => smtp.Send(message), cancellationToken);
+            _logger.LogInformation("Email sent to {To} (attachment={HasAttachment})", toEmail, attachment != null);
+        }
+        finally
+        {
+            attachment?.Dispose();
+        }
     }
 }

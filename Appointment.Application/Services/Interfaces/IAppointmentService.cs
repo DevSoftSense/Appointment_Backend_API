@@ -52,4 +52,10 @@ public interface IAppointmentService
         long appointmentId,
         long updatedBy,
         CancellationToken cancellationToken = default);
+
+    Task<AppointmentDetailDto> MarkNoShowAsync(
+        int orgId,
+        long appointmentId,
+        long updatedBy,
+        CancellationToken cancellationToken = default);
 }

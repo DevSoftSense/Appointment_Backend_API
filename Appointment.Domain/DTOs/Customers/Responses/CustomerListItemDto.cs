@@ -26,6 +26,8 @@ public sealed class CustomerListItemDto
     public int? BranchId { get; set; }
     public string? Status { get; set; }
     public string? Remarks { get; set; }
+    public string? PartyProfile { get; set; }
+    public string? ProfilePhotoUrl { get; set; }
     public DateTimeOffset? CreatedOn { get; set; }
     public long AppointmentCount { get; set; }
     public long TotalCount { get; set; }
