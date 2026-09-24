@@ -112,6 +112,10 @@ builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IOrgMastersRepository, OrgMastersRepository>();
 builder.Services.AddScoped<IOrgMastersService, OrgMastersService>();
 
+// ─── Sidebar menu (tab_menu_master) ───────────────────────────────────────────
+builder.Services.AddScoped<IMenuRepository, MenuRepository>();
+builder.Services.AddScoped<IMenuService, MenuService>();
+
 // ─── Reminders (email queue on public.tab_notifications) ──────────────────────
 builder.Services.AddScoped<IReminderRepository, ReminderRepository>();
 builder.Services.AddScoped<IReminderService, ReminderService>();

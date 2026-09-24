@@ -36,3 +36,25 @@ public sealed class UpdateBranchRequest
     public string? Pincode { get; set; }
     public bool? IsActive { get; set; }
 }
+
+public sealed class GetDepartmentsRequest
+{
+    public int? BranchId { get; set; }
+    public bool IncludeInactive { get; set; }
+    public int Limit { get; set; } = 100;
+    public int Offset { get; set; }
+}
+
+public sealed class SaveDepartmentRequest
+{
+    public int BranchId { get; set; }
+    public string? DepartmentName { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class UpdateDepartmentRequest
+{
+    public int? BranchId { get; set; }
+    public string? DepartmentName { get; set; }
+    public bool? IsActive { get; set; }
+}

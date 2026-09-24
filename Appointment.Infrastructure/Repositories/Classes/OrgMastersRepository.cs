@@ -10,7 +10,7 @@ using NpgsqlTypes;
 namespace Appointment.Infrastructure.Repositories.Classes;
 
 /// <summary>
-/// Calls appointment.fn_appointment_org_masters(p_action, …). Branch CRUD only. No inline table SQL.
+/// Calls appointment.fn_appointment_org_masters(p_action, …). Branch + Department CRUD. No inline table SQL.
 /// </summary>
 public sealed class OrgMastersRepository : IOrgMastersRepository
 {
@@ -168,6 +168,134 @@ public sealed class OrgMastersRepository : IOrgMastersRepository
         }
     }
 
+    public async Task<IReadOnlyList<DepartmentDetailDto>> ListDepartmentsAsync(
+        int orgId, int appId, GetDepartmentsRequest request, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync(
+                "list_departments",
+                orgId,
+                appId,
+                branchId: request.BranchId,
+                includeInactive: request.IncludeInactive,
+                limit: request.Limit,
+                offset: request.Offset);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return [];
+
+            return JsonSerializer.Deserialize<List<DepartmentDetailDto>>(json, PostgresJsonOptions.Options) ?? [];
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} list_departments for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize list_departments for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Department list could not be parsed.", ex);
+        }
+    }
+
+    public async Task<DepartmentDetailDto> GetDepartmentAsync(
+        int orgId, int appId, int departmentId, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync("get_department", orgId, appId, departmentId: departmentId);
+            return JsonSerializer.Deserialize<DepartmentDetailDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Department not found.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} get_department for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize get_department for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Department could not be parsed.", ex);
+        }
+    }
+
+    public async Task<DepartmentDetailDto> CreateDepartmentAsync(
+        int orgId, int appId, SaveDepartmentRequest request, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync(
+                "create_department",
+                orgId,
+                appId,
+                branchId: request.BranchId,
+                departmentName: request.DepartmentName,
+                isActive: request.IsActive);
+
+            return JsonSerializer.Deserialize<DepartmentDetailDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Create department returned empty response.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} create_department for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize create_department for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Create department response could not be parsed.", ex);
+        }
+    }
+
+    public async Task<DepartmentDetailDto> UpdateDepartmentAsync(
+        int orgId, int appId, int departmentId, UpdateDepartmentRequest request, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync(
+                "update_department",
+                orgId,
+                appId,
+                branchId: request.BranchId,
+                departmentId: departmentId,
+                departmentName: request.DepartmentName,
+                isActive: request.IsActive);
+
+            return JsonSerializer.Deserialize<DepartmentDetailDto>(json, PostgresJsonOptions.Options)
+                   ?? throw new InvalidOperationException("Update department returned empty response.");
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} update_department for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize update_department for orgId {OrgId}", orgId);
+            throw new InvalidOperationException("Update department response could not be parsed.", ex);
+        }
+    }
+
+    public async Task DeactivateDepartmentAsync(
+        int orgId, int appId, int departmentId, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            await CallAsync("deactivate_department", orgId, appId, departmentId: departmentId);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error in {Fn} deactivate_department for orgId {OrgId}", Fn, orgId);
+            throw;
+        }
+    }
+
     private Task<string> CallAsync(
         string action,
         int orgId,
@@ -186,7 +314,9 @@ public sealed class OrgMastersRepository : IOrgMastersRepository
         bool? isActive = null,
         bool? includeInactive = null,
         int? limit = null,
-        int? offset = null) =>
+        int? offset = null,
+        int? departmentId = null,
+        string? departmentName = null) =>
         _db.ExecuteJsonFunctionAsync(
             Fn,
             Varchar(action),
@@ -206,7 +336,9 @@ public sealed class OrgMastersRepository : IOrgMastersRepository
             Bool(isActive),
             Bool(includeInactive),
             NullableInt(limit),
-            NullableInt(offset));
+            NullableInt(offset),
+            NullableInt(departmentId),
+            Varchar(departmentName));
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };

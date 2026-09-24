@@ -19,4 +19,19 @@ public interface IOrgMastersRepository
 
     Task DeactivateBranchAsync(
         int orgId, int appId, int branchId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DepartmentDetailDto>> ListDepartmentsAsync(
+        int orgId, int appId, GetDepartmentsRequest request, CancellationToken cancellationToken = default);
+
+    Task<DepartmentDetailDto> GetDepartmentAsync(
+        int orgId, int appId, int departmentId, CancellationToken cancellationToken = default);
+
+    Task<DepartmentDetailDto> CreateDepartmentAsync(
+        int orgId, int appId, SaveDepartmentRequest request, CancellationToken cancellationToken = default);
+
+    Task<DepartmentDetailDto> UpdateDepartmentAsync(
+        int orgId, int appId, int departmentId, UpdateDepartmentRequest request, CancellationToken cancellationToken = default);
+
+    Task DeactivateDepartmentAsync(
+        int orgId, int appId, int departmentId, CancellationToken cancellationToken = default);
 }

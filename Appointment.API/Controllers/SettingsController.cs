@@ -434,6 +434,166 @@ public sealed class SettingsController : ControllerBase
         }
     }
 
+    /// <summary>GET api/settings/departments</summary>
+    [HttpGet("departments")]
+    public async Task<IActionResult> ListDepartmentsAsync(
+        [FromQuery] int? branchId = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] int limit = 100,
+        [FromQuery] int offset = 0,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _orgMastersService.ListDepartmentsAsync(
+                orgId,
+                new GetDepartmentsRequest
+                {
+                    BranchId = branchId,
+                    IncludeInactive = includeInactive,
+                    Limit = limit,
+                    Offset = offset
+                },
+                cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings departments list failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/settings/departments");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load departments." });
+        }
+    }
+
+    /// <summary>GET api/settings/departments/{departmentId}</summary>
+    [HttpGet("departments/{departmentId:int}")]
+    public async Task<IActionResult> GetDepartmentAsync(
+        int departmentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.GetDepartmentAsync(orgId, departmentId, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings get department failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in GET api/settings/departments/{DepartmentId}", departmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to load department." });
+        }
+    }
+
+    /// <summary>POST api/settings/departments</summary>
+    [HttpPost("departments")]
+    public async Task<IActionResult> CreateDepartmentAsync(
+        [FromBody] SaveDepartmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.CreateDepartmentAsync(orgId, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings create department failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/settings/departments");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to create department." });
+        }
+    }
+
+    /// <summary>PUT api/settings/departments/{departmentId}</summary>
+    [HttpPut("departments/{departmentId:int}")]
+    public async Task<IActionResult> UpdateDepartmentAsync(
+        int departmentId,
+        [FromBody] UpdateDepartmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            return Ok(await _orgMastersService.UpdateDepartmentAsync(orgId, departmentId, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings update department failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in PUT api/settings/departments/{DepartmentId}", departmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update department." });
+        }
+    }
+
+    /// <summary>DELETE api/settings/departments/{departmentId} — set inactive</summary>
+    [HttpDelete("departments/{departmentId:int}")]
+    public async Task<IActionResult> DeactivateDepartmentAsync(
+        int departmentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            await _orgMastersService.DeactivateDepartmentAsync(orgId, departmentId, cancellationToken);
+            return Ok(new { departmentId, deleted = true });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Settings deactivate department failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in DELETE api/settings/departments/{DepartmentId}", departmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to deactivate department." });
+        }
+    }
+
     /// <summary>GET api/settings/public-booking-link — encrypted QR token for this org (no raw org id in customer URL).</summary>
     [HttpGet("public-booking-link")]
     public IActionResult GetPublicBookingLink()
