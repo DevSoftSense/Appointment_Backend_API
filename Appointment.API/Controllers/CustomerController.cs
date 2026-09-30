@@ -15,15 +15,18 @@ public sealed class CustomerController : ControllerBase
 {
     private readonly ICustomerService _customerService;
     private readonly IAppointmentDocumentService _documentService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<CustomerController> _logger;
 
     public CustomerController(
         ICustomerService customerService,
         IAppointmentDocumentService documentService,
+        IPermissionService permissionService,
         ILogger<CustomerController> logger)
     {
         _customerService = customerService;
         _documentService = documentService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -206,6 +209,9 @@ public sealed class CustomerController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CUSTOMERS", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -244,6 +250,9 @@ public sealed class CustomerController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CUSTOMERS", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -281,6 +290,9 @@ public sealed class CustomerController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CUSTOMERS", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _customerService.DeactivateCustomerAsync(orgId, accountId, cancellationToken);

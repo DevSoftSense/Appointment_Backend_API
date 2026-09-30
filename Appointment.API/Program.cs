@@ -87,6 +87,12 @@ builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IAppointmentDocumentRepository, AppointmentDocumentRepository>();
 builder.Services.AddScoped<IAppointmentDocumentService, AppointmentDocumentService>();
+builder.Services.AddScoped<IFollowUpRepository, FollowUpRepository>();
+builder.Services.AddScoped<IFollowUpService, FollowUpService>();
+
+// ─── Appointment payment (entry) DI ───────────────────────────────────────────
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 // ─── Queue / Check-In DI ──────────────────────────────────────────────────────
 builder.Services.AddScoped<IQueueRepository, QueueRepository>();
@@ -95,6 +101,10 @@ builder.Services.AddScoped<IQueueService, QueueService>();
 // ─── Cabin / Room DI ──────────────────────────────────────────────────────────
 builder.Services.AddScoped<ICabinRepository, CabinRepository>();
 builder.Services.AddScoped<ICabinService, CabinService>();
+
+// ─── Referral / Reference DI ──────────────────────────────────────────────────
+builder.Services.AddScoped<IReferralRepository, ReferralRepository>();
+builder.Services.AddScoped<IReferralService, ReferralService>();
 
 // ─── Dashboard DI ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
@@ -115,6 +125,8 @@ builder.Services.AddScoped<IOrgMastersService, OrgMastersService>();
 // ─── Sidebar menu (tab_menu_master) ───────────────────────────────────────────
 builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 builder.Services.AddScoped<IMenuService, MenuService>();
+builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // ─── Reminders (email queue on public.tab_notifications) ──────────────────────
 builder.Services.AddScoped<IReminderRepository, ReminderRepository>();

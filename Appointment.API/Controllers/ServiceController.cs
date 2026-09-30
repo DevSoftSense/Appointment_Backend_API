@@ -14,11 +14,16 @@ namespace Appointment.API.Controllers;
 public sealed class ServiceController : ControllerBase
 {
     private readonly IServiceCatalogService _serviceCatalogService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<ServiceController> _logger;
 
-    public ServiceController(IServiceCatalogService serviceCatalogService, ILogger<ServiceController> logger)
+    public ServiceController(
+        IServiceCatalogService serviceCatalogService,
+        IPermissionService permissionService,
+        ILogger<ServiceController> logger)
     {
         _serviceCatalogService = serviceCatalogService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -105,6 +110,10 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "add", cancellationToken);
+        if (denied != null) return denied;
+
         try
         {
             var created = await _serviceCatalogService.CreateCategoryAsync(orgId, request, cancellationToken);
@@ -136,6 +145,9 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             return Ok(await _serviceCatalogService.UpdateCategoryAsync(orgId, categoryId, request, cancellationToken));
@@ -165,6 +177,9 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             return Ok(await _serviceCatalogService.DeactivateCategoryAsync(orgId, categoryId, cancellationToken));
@@ -227,6 +242,9 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -265,6 +283,9 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -302,6 +323,9 @@ public sealed class ServiceController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "SERVICES", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _serviceCatalogService.DeactivateServiceAsync(orgId, productId, cancellationToken);

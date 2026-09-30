@@ -111,6 +111,8 @@ public sealed class CustomerService : ICustomerService
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             throw new ArgumentException("Email is not valid.");
 
+        ValidateBirthAndSinceDates(request.DateOfBirth, request.CustomerSince);
+
         var appId = GetAppId();
 
         try
@@ -151,6 +153,8 @@ public sealed class CustomerService : ICustomerService
 
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             throw new ArgumentException("Email is not valid.");
+
+        ValidateBirthAndSinceDates(request.DateOfBirth, request.CustomerSince);
 
         var appId = GetAppId();
 
@@ -300,6 +304,16 @@ public sealed class CustomerService : ICustomerService
     {
         if (orgId <= 0)
             throw new ArgumentException("Organisation ID is required.");
+    }
+
+    private static void ValidateBirthAndSinceDates(DateOnly? dateOfBirth, DateOnly? customerSince)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        if (dateOfBirth.HasValue && dateOfBirth.Value > today)
+            throw new ArgumentException("Date of birth cannot be in the future.");
+
+        if (dateOfBirth.HasValue && customerSince.HasValue && customerSince.Value < dateOfBirth.Value)
+            throw new ArgumentException("Customer since cannot be before date of birth.");
     }
 
     private static void AttachPhotoUrl(CustomerDetailDto? customer)

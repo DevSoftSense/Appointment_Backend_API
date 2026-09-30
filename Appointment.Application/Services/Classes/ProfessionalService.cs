@@ -73,6 +73,8 @@ public sealed class ProfessionalService : IProfessionalService
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             throw new ArgumentException("Email is not valid.");
 
+        ValidateBirthAndJoinDates(request.DateOfBirth, request.JoinDate);
+
         var appId = GetAppId();
 
         try
@@ -104,6 +106,8 @@ public sealed class ProfessionalService : IProfessionalService
 
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             throw new ArgumentException("Email is not valid.");
+
+        ValidateBirthAndJoinDates(request.DateOfBirth, request.JoinDate);
 
         var appId = GetAppId();
 
@@ -231,6 +235,29 @@ public sealed class ProfessionalService : IProfessionalService
         return await _professionalRepository.SaveScheduleAsync(orgId, appId, employeeId, request, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ScheduleConflictDto>> GetScheduleConflictsAsync(
+        int orgId,
+        int employeeId,
+        SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (employeeId <= 0)
+            throw new ArgumentException("Professional id is required.", nameof(employeeId));
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.EffectiveFrom.HasValue
+            && request.EffectiveTo.HasValue
+            && request.EffectiveTo.Value < request.EffectiveFrom.Value)
+        {
+            throw new ArgumentException("Effective To must be on or after Effective From.");
+        }
+
+        var appId = GetAppId();
+        return await _professionalRepository.GetScheduleConflictsAsync(
+            orgId, appId, employeeId, request, cancellationToken);
+    }
+
     public async Task<ProfessionalScheduleGridDto> GetScheduleGridAsync(
         int orgId,
         DateOnly fromDate,
@@ -298,5 +325,15 @@ public sealed class ProfessionalService : IProfessionalService
     {
         if (orgId <= 0)
             throw new ArgumentException("Organisation ID is required.");
+    }
+
+    private static void ValidateBirthAndJoinDates(DateOnly? dateOfBirth, DateOnly? joinDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        if (dateOfBirth.HasValue && dateOfBirth.Value > today)
+            throw new ArgumentException("Date of birth cannot be in the future.");
+
+        if (dateOfBirth.HasValue && joinDate.HasValue && joinDate.Value < dateOfBirth.Value)
+            throw new ArgumentException("Join date cannot be before date of birth.");
     }
 }

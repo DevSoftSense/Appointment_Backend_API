@@ -13,11 +13,16 @@ namespace Appointment.API.Controllers;
 public sealed class QueueController : ControllerBase
 {
     private readonly IQueueService _queueService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<QueueController> _logger;
 
-    public QueueController(IQueueService queueService, ILogger<QueueController> logger)
+    public QueueController(
+        IQueueService queueService,
+        IPermissionService permissionService,
+        ILogger<QueueController> logger)
     {
         _queueService = queueService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -181,6 +186,9 @@ public sealed class QueueController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "QUEUE_CHECK_IN", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -214,6 +222,9 @@ public sealed class QueueController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "QUEUE_CHECK_IN", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 

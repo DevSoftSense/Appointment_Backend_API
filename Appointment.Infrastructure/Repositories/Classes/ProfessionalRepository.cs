@@ -449,6 +449,61 @@ public sealed class ProfessionalRepository : IProfessionalRepository
         }
     }
 
+    public async Task<IReadOnlyList<ScheduleConflictDto>> GetScheduleConflictsAsync(
+        int orgId,
+        int appId,
+        int employeeId,
+        SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+
+        try
+        {
+            var payload = new
+            {
+                days = (request.Days ?? []).Select(d => new
+                {
+                    dayOfWeek = d.DayOfWeek,
+                    isClosed = d.IsClosed,
+                    start = d.Start,
+                    end = d.End,
+                    breakStart = d.BreakStart,
+                    breakEnd = d.BreakEnd
+                }),
+                consultDurationMinutes = request.ConsultDurationMinutes,
+                bufferMinutes = request.BufferMinutes,
+                timezone = request.Timezone,
+                effectiveFrom = request.EffectiveFrom?.ToString("yyyy-MM-dd"),
+                effectiveTo = request.EffectiveTo?.ToString("yyyy-MM-dd")
+            };
+
+            var scheduleJson = JsonSerializer.Serialize(payload, PostgresJsonOptions.Options);
+            var json = await CallAsync(
+                "schedule_conflicts",
+                orgId,
+                appId,
+                employeeId: employeeId,
+                scheduleJson: scheduleJson);
+
+            if (string.IsNullOrWhiteSpace(json) || json == "null")
+                return [];
+
+            return JsonSerializer.Deserialize<List<ScheduleConflictDto>>(json, PostgresJsonOptions.Options)
+                   ?? [];
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} schedule_conflicts for employeeId {EmployeeId}", Fn, employeeId);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize schedule_conflicts for employeeId {EmployeeId}", employeeId);
+            throw new InvalidOperationException("Schedule conflicts response could not be parsed.", ex);
+        }
+    }
+
     public async Task<ProfessionalScheduleGridDto> GetScheduleGridAsync(
         int orgId,
         int appId,

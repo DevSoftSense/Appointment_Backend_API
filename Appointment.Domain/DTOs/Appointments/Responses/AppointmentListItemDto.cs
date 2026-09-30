@@ -9,7 +9,7 @@ public sealed class AppointmentListItemDto
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }
     public string? CustomerEmail { get; set; }
-    public long ProfessionalId { get; set; }
+    public long? ProfessionalId { get; set; }
     public string? ProfessionalName { get; set; }
     public long ProductId { get; set; }
     public string? ServiceName { get; set; }

@@ -14,11 +14,16 @@ namespace Appointment.API.Controllers;
 public sealed class CabinController : ControllerBase
 {
     private readonly ICabinService _cabinService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<CabinController> _logger;
 
-    public CabinController(ICabinService cabinService, ILogger<CabinController> logger)
+    public CabinController(
+        ICabinService cabinService,
+        IPermissionService permissionService,
+        ILogger<CabinController> logger)
     {
         _cabinService = cabinService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -165,6 +170,9 @@ public sealed class CabinController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CABINS", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -203,6 +211,9 @@ public sealed class CabinController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CABINS", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -240,6 +251,9 @@ public sealed class CabinController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "CABINS", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _cabinService.DeactivateCabinAsync(orgId, cabinResourceId, cancellationToken);

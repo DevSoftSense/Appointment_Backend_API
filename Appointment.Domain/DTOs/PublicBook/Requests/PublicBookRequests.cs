@@ -27,7 +27,7 @@ public sealed class PublicCreateAppointmentRequest
     public int OrgId { get; set; }
 
     public long CustomerId { get; set; }
-    public long ProfessionalId { get; set; }
+    public long? ProfessionalId { get; set; }
     public long ProductId { get; set; }
     public long? BranchId { get; set; }
     public DateTimeOffset StartDatetime { get; set; }

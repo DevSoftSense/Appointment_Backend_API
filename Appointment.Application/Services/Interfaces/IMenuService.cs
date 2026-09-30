@@ -4,5 +4,8 @@ namespace Appointment.Application.Services.Interfaces;
 
 public interface IMenuService
 {
-    Task<IReadOnlyList<MenuItemDto>> GetSidebarAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MenuItemDto>> GetSidebarAsync(
+        int orgId,
+        IReadOnlyList<string>? roleCodes = null,
+        CancellationToken cancellationToken = default);
 }

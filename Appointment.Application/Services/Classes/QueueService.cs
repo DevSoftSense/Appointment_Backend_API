@@ -93,12 +93,11 @@ public sealed class QueueService : IQueueService
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (createdBy <= 0) throw new ArgumentException("Created-by user is required.");
         if (request.CustomerId <= 0) throw new ArgumentException("Customer is required.");
-        if (request.ProfessionalId <= 0) throw new ArgumentException("Professional is required.");
         if (request.ProductId <= 0) throw new ArgumentException("Service is required.");
 
         _logger.LogInformation(
             "Queue walk-in org={OrgId} customer={CustomerId} professional={ProfessionalId}",
-            orgId, request.CustomerId, request.ProfessionalId);
+            orgId, request.CustomerId, request.ProfessionalId?.ToString() ?? "(none)");
 
         return await _queueRepository.AddWalkInAsync(orgId, GetAppId(), createdBy, request, cancellationToken);
     }

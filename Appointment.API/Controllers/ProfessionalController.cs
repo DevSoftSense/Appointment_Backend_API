@@ -14,11 +14,16 @@ namespace Appointment.API.Controllers;
 public sealed class ProfessionalController : ControllerBase
 {
     private readonly IProfessionalService _professionalService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<ProfessionalController> _logger;
 
-    public ProfessionalController(IProfessionalService professionalService, ILogger<ProfessionalController> logger)
+    public ProfessionalController(
+        IProfessionalService professionalService,
+        IPermissionService permissionService,
+        ILogger<ProfessionalController> logger)
     {
         _professionalService = professionalService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -191,6 +196,10 @@ public sealed class ProfessionalController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "PROFESSIONALS", "edit", cancellationToken);
+        if (denied != null) return denied;
+
         try
         {
             var result = await _professionalService.SetProfessionalServicesAsync(
@@ -353,6 +362,9 @@ public sealed class ProfessionalController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "PROFESSIONALS", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _professionalService.SaveScheduleAsync(orgId, employeeId, request, cancellationToken);
@@ -371,6 +383,42 @@ public sealed class ProfessionalController : ControllerBase
         {
             _logger.LogError(ex, "Unhandled error in PUT api/professionals/{EmployeeId}/schedule", employeeId);
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to save professional schedule." });
+        }
+    }
+
+    /// <summary>
+    /// POST api/professionals/{employeeId}/schedule/conflicts
+    /// Warn-before-save: live appointments that fall outside the proposed weekly hours.
+    /// Does not change any data.
+    /// </summary>
+    [HttpPost("{employeeId:int}/schedule/conflicts")]
+    public async Task<IActionResult> GetScheduleConflictsAsync(
+        int employeeId,
+        [FromBody] SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out _, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _professionalService.GetScheduleConflictsAsync(
+                orgId, employeeId, request, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Schedule conflicts check failed in DB function.");
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in POST api/professionals/{EmployeeId}/schedule/conflicts", employeeId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to check schedule conflicts." });
         }
     }
 
@@ -476,6 +524,9 @@ public sealed class ProfessionalController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "PROFESSIONALS", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -514,6 +565,9 @@ public sealed class ProfessionalController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "PROFESSIONALS", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -551,6 +605,9 @@ public sealed class ProfessionalController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "PROFESSIONALS", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _professionalService.DeactivateProfessionalAsync(orgId, employeeId, cancellationToken);

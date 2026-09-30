@@ -14,15 +14,18 @@ public sealed class AppointmentController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
     private readonly IAppointmentDocumentService _documentService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<AppointmentController> _logger;
 
     public AppointmentController(
         IAppointmentService appointmentService,
         IAppointmentDocumentService documentService,
+        IPermissionService permissionService,
         ILogger<AppointmentController> logger)
     {
         _appointmentService = appointmentService;
         _documentService = documentService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -161,6 +164,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "add", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -195,6 +201,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "edit", cancellationToken);
+        if (denied != null) return denied;
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
 
@@ -230,6 +239,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "delete", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _appointmentService.CancelAppointmentAsync(
@@ -261,6 +273,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _appointmentService.CheckInAppointmentAsync(
@@ -292,6 +307,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _appointmentService.CompleteAppointmentAsync(
@@ -323,6 +341,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out var userId, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             var result = await _appointmentService.MarkNoShowAsync(
@@ -419,6 +440,9 @@ public sealed class AppointmentController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
+        var denied = await PermissionAuthHelper.ForbidUnlessCanAsync(
+            this, _permissionService, orgId, "APPOINTMENTS", "edit", cancellationToken);
+        if (denied != null) return denied;
         try
         {
             await _documentService.DeleteAsync(orgId, appointmentId, documentId, cancellationToken);

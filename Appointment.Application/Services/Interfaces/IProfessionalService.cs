@@ -67,6 +67,12 @@ public interface IProfessionalService
         SaveProfessionalScheduleRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ScheduleConflictDto>> GetScheduleConflictsAsync(
+        int orgId,
+        int employeeId,
+        SaveProfessionalScheduleRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<ProfessionalScheduleGridDto> GetScheduleGridAsync(
         int orgId,
         DateOnly fromDate,

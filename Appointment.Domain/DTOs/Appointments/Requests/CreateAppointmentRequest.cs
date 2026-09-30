@@ -3,7 +3,7 @@ namespace Appointment.Domain.DTOs.Appointments.Requests;
 public sealed class CreateAppointmentRequest
 {
     public long CustomerId { get; set; }
-    public long ProfessionalId { get; set; }
+    public long? ProfessionalId { get; set; }
     public long ProductId { get; set; }
     public long? BranchId { get; set; }
     public long? CabinResourceId { get; set; }

@@ -20,16 +20,21 @@ public sealed class MenuController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>GET api/menus/sidebar — top-level + children from tab_menu_master</summary>
+    /// <summary>GET api/menus/sidebar?roleCodes=A,B — filtered by role permissions</summary>
     [HttpGet("sidebar")]
-    public async Task<IActionResult> GetSidebarAsync(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetSidebarAsync(
+        [FromQuery] string? roleCodes,
+        CancellationToken cancellationToken = default)
     {
-        if (!TryGetAuthContext(out _, out _))
+        if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
         try
         {
-            return Ok(await _menuService.GetSidebarAsync(cancellationToken));
+            var codes = string.IsNullOrWhiteSpace(roleCodes)
+                ? Array.Empty<string>()
+                : roleCodes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return Ok(await _menuService.GetSidebarAsync(orgId, codes, cancellationToken));
         }
         catch (InvalidOperationException ex)
         {

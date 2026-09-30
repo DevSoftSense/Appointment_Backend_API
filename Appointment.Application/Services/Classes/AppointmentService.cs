@@ -88,8 +88,6 @@ public sealed class AppointmentService : IAppointmentService
             throw new ArgumentException("Created-by user is required.");
         if (request.CustomerId <= 0)
             throw new ArgumentException("Customer is required.");
-        if (request.ProfessionalId <= 0)
-            throw new ArgumentException("Professional is required.");
         if (request.ProductId <= 0)
             throw new ArgumentException("Service is required.");
         if (request.StartDatetime == default)
@@ -109,7 +107,7 @@ public sealed class AppointmentService : IAppointmentService
         var appId = GetAppId();
         _logger.LogInformation(
             "Creating appointment org={OrgId} customer={CustomerId} professional={ProfessionalId} product={ProductId}",
-            orgId, request.CustomerId, request.ProfessionalId, request.ProductId);
+            orgId, request.CustomerId, request.ProfessionalId?.ToString() ?? "(none)", request.ProductId);
 
         var created = await _appointmentRepository.CreateAppointmentAsync(
             orgId, appId, createdBy, request, cancellationToken);

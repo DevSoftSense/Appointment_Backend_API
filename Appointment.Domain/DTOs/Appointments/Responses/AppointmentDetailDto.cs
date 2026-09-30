@@ -11,7 +11,7 @@ public sealed class AppointmentDetailDto
     public string? CustomerEmail { get; set; }
     public string? CustomerPartyCode { get; set; }
     public string? CustomerTypeName { get; set; }
-    public long ProfessionalId { get; set; }
+    public long? ProfessionalId { get; set; }
     public string? ProfessionalName { get; set; }
     public long ProductId { get; set; }
     public string? ServiceName { get; set; }
@@ -40,6 +40,9 @@ public sealed class AppointmentDetailDto
     public DateOnly? FollowUpDate { get; set; }
     public string? FollowUpNotes { get; set; }
     public bool FollowUpCompleted { get; set; }
+    public long? ParentAppointmentId { get; set; }
+    public string? ParentAppointmentNo { get; set; }
+    public long? RecurrenceId { get; set; }
     public DateTimeOffset? CheckedInAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public string? CancellationReason { get; set; }

@@ -111,7 +111,13 @@ public sealed class ServiceRepository : IServiceRepository
                 sellingPrice: request.SellingPrice,
                 durationMinutes: request.DurationMinutes,
                 salesDescription: request.SalesDescription,
-                setIsActive: request.IsActive ?? true);
+                setIsActive: request.IsActive ?? true,
+                taxGroupId: request.TaxGroupId,
+                cgstPer: request.CgstPer,
+                sgstPer: request.SgstPer,
+                igstPer: request.IgstPer,
+                isEmployeeRequired: request.IsEmployeeRequired,
+                isResourceRequired: request.IsResourceRequired);
 
             return JsonSerializer.Deserialize<CreateServiceResponse>(json, PostgresJsonOptions.Options)
                    ?? throw new InvalidOperationException($"{Fn} create returned no data");
@@ -149,7 +155,13 @@ public sealed class ServiceRepository : IServiceRepository
                 sellingPrice: request.SellingPrice,
                 durationMinutes: request.DurationMinutes,
                 salesDescription: request.SalesDescription,
-                setIsActive: request.IsActive);
+                setIsActive: request.IsActive,
+                taxGroupId: request.TaxGroupId,
+                cgstPer: request.CgstPer,
+                sgstPer: request.SgstPer,
+                igstPer: request.IgstPer,
+                isEmployeeRequired: request.IsEmployeeRequired,
+                isResourceRequired: request.IsResourceRequired);
 
             return JsonSerializer.Deserialize<CreateServiceResponse>(json, PostgresJsonOptions.Options)
                    ?? throw new InvalidOperationException($"{Fn} update returned no data");
@@ -334,7 +346,13 @@ public sealed class ServiceRepository : IServiceRepository
         decimal? sellingPrice = null,
         int? durationMinutes = null,
         string? salesDescription = null,
-        bool? setIsActive = null) =>
+        bool? setIsActive = null,
+        int? taxGroupId = null,
+        decimal? cgstPer = null,
+        decimal? sgstPer = null,
+        decimal? igstPer = null,
+        bool? isEmployeeRequired = null,
+        bool? isResourceRequired = null) =>
         _db.ExecuteJsonFunctionAsync(
             Fn,
             Varchar(action),
@@ -351,7 +369,13 @@ public sealed class ServiceRepository : IServiceRepository
             Numeric(sellingPrice),
             NullableInt(durationMinutes),
             Text(salesDescription),
-            Bool(setIsActive));
+            Bool(setIsActive),
+            NullableInt(taxGroupId),
+            Numeric(cgstPer),
+            Numeric(sgstPer),
+            Numeric(igstPer),
+            Bool(isEmployeeRequired),
+            Bool(isResourceRequired));
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };
