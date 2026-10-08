@@ -24,6 +24,7 @@ public sealed class MenuService : IMenuService
     public async Task<IReadOnlyList<MenuItemDto>> GetSidebarAsync(
         int orgId,
         IReadOnlyList<string>? roleCodes = null,
+        string? userType = null,
         CancellationToken cancellationToken = default)
     {
         var appId = _configuration.GetValue<int?>("Appointment:AppId")
@@ -37,7 +38,7 @@ public sealed class MenuService : IMenuService
             return all;
 
         var my = await _permissionService.GetMyAsync(
-            orgId, roleCodes ?? [], false, cancellationToken);
+            orgId, roleCodes ?? [], false, userType, cancellationToken);
 
         // Fail-open / admin → show all
         if (my.IsAdmin || my.FailOpen)

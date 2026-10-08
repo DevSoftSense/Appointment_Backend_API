@@ -32,8 +32,9 @@ public static class PermissionAuthHelper
         CancellationToken cancellationToken = default)
     {
         var codes = GetRoleCodes(controller.Request);
+        var userType = AuthContextHelper.GetUserType(controller.User, controller.Request);
         var allowed = await permissionService.CanAsync(
-            orgId, codes, menuCode, action, cancellationToken);
+            orgId, codes, menuCode, action, userType, cancellationToken);
         if (allowed) return null;
 
         return controller.StatusCode(
