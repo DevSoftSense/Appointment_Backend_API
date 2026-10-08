@@ -34,7 +34,8 @@ public sealed class MenuController : ControllerBase
             var codes = string.IsNullOrWhiteSpace(roleCodes)
                 ? Array.Empty<string>()
                 : roleCodes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return Ok(await _menuService.GetSidebarAsync(orgId, codes, cancellationToken));
+            var userType = AuthContextHelper.GetUserType(HttpContext);
+            return Ok(await _menuService.GetSidebarAsync(orgId, codes, userType, cancellationToken));
         }
         catch (InvalidOperationException ex)
         {

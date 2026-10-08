@@ -16,12 +16,16 @@ public interface IPermissionService
         CancellationToken cancellationToken = default);
 
     Task<MyPermissionsDto> GetMyAsync(
-        int orgId, IReadOnlyList<string> roleCodes, bool isAdmin,
+        int orgId, IReadOnlyList<string> roleCodes, bool isAdmin, string? userType = null,
         CancellationToken cancellationToken = default);
 
     Task SeedPresetsAsync(int orgId, CancellationToken cancellationToken = default);
 
     bool IsAdminRoleCodes(IEnumerable<string>? roleCodes);
+
+    bool IsPrimeUserType(string? userType);
+
+    bool IsAppAdmin(IEnumerable<string>? roleCodes, string? userType);
 
     /// <summary>
     /// True when admin, fail-open (no matrix rows yet), or the role has the flag on menuCode.
@@ -32,5 +36,6 @@ public interface IPermissionService
         IReadOnlyList<string> roleCodes,
         string menuCode,
         string action,
+        string? userType = null,
         CancellationToken cancellationToken = default);
 }

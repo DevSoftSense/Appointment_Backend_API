@@ -45,7 +45,7 @@ public sealed class PermissionService : IPermissionService
     }
 
     public Task<MyPermissionsDto> GetMyAsync(
-        int orgId, IReadOnlyList<string> roleCodes, bool isAdmin,
+        int orgId, IReadOnlyList<string> roleCodes, bool isAdmin, string? userType = null,
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
@@ -56,7 +56,7 @@ public sealed class PermissionService : IPermissionService
             .ToList();
 
         if (!isAdmin)
-            isAdmin = IsAdminRoleCodes(codes);
+            isAdmin = IsAppAdmin(codes, userType);
 
         return _repository.GetMyAsync(orgId, GetAppId(), codes, isAdmin, cancellationToken);
     }
@@ -68,18 +68,34 @@ public sealed class PermissionService : IPermissionService
     }
 
     public bool IsAdminRoleCodes(IEnumerable<string>? roleCodes) =>
-        (roleCodes ?? []).Any(c =>
-        {
-            var code = (c ?? "").Trim().ToUpperInvariant();
-            return code.EndsWith("_ADMIN", StringComparison.Ordinal)
-                   || code is "APPOINTMENT_ADMIN" or "ADMIN";
-        });
+        (roleCodes ?? []).Any(IsAdminRoleCode);
+
+    /// <summary>
+    /// SoftOnCloud app admins: *_ADMIN, ADMIN, and platform org-owner codes (ORG_OWNER).
+    /// </summary>
+    public static bool IsAdminRoleCode(string? roleCode)
+    {
+        var code = (roleCode ?? "").Trim().ToUpperInvariant();
+        if (code.Length == 0) return false;
+        if (code.EndsWith("_ADMIN", StringComparison.Ordinal)) return true;
+        return code is "APPOINTMENT_ADMIN" or "ADMIN" or "ORG_OWNER" or "OWNER" or "ORGADMIN";
+    }
+
+    public bool IsPrimeUserType(string? userType)
+    {
+        var t = (userType ?? "").Trim().ToLowerInvariant();
+        return t is "prime" or "owner" or "org_owner";
+    }
+
+    public bool IsAppAdmin(IEnumerable<string>? roleCodes, string? userType) =>
+        IsAdminRoleCodes(roleCodes) || IsPrimeUserType(userType);
 
     public async Task<bool> CanAsync(
         int orgId,
         IReadOnlyList<string> roleCodes,
         string menuCode,
         string action,
+        string? userType = null,
         CancellationToken cancellationToken = default)
     {
         ValidateOrg(orgId);
@@ -87,7 +103,7 @@ public sealed class PermissionService : IPermissionService
         if (string.IsNullOrWhiteSpace(code))
             return false;
 
-        var my = await GetMyAsync(orgId, roleCodes ?? [], false, cancellationToken);
+        var my = await GetMyAsync(orgId, roleCodes ?? [], false, userType, cancellationToken);
         if (my.IsAdmin || my.FailOpen)
             return true;
 

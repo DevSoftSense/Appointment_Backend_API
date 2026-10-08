@@ -56,6 +56,8 @@ public sealed class DashboardTopProfessionalDto
 {
     public long ProfessionalId { get; set; }
     public string? ProfessionalName { get; set; }
+    public string? RoleName { get; set; }
+    public string? DepartmentName { get; set; }
     public long Count { get; set; }
 }
 

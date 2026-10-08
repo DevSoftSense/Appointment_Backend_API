@@ -34,8 +34,9 @@ public sealed class PermissionController : ControllerBase
 
         try
         {
-            var codes = SplitCodes(roleCodes);
-            var result = await _permissionService.GetMyAsync(orgId, codes, false, cancellationToken);
+            var codes = MergeRoleCodes(roleCodes, Request);
+            var userType = AuthContextHelper.GetUserType(HttpContext);
+            var result = await _permissionService.GetMyAsync(orgId, codes, false, userType, cancellationToken);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -106,7 +107,9 @@ public sealed class PermissionController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
-        if (!_permissionService.IsAdminRoleCodes(SplitCodes(roleCodes)))
+        var userType = AuthContextHelper.GetUserType(HttpContext);
+        var codes = MergeRoleCodes(roleCodes, Request);
+        if (!_permissionService.IsAppAdmin(codes, userType))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only app admins can edit permissions." });
 
         try
@@ -139,7 +142,9 @@ public sealed class PermissionController : ControllerBase
         if (!TryGetAuthContext(out _, out var orgId))
             return Unauthorized(new { message = "Invalid or missing authentication token." });
 
-        if (!_permissionService.IsAdminRoleCodes(SplitCodes(roleCodes)))
+        var userType = AuthContextHelper.GetUserType(HttpContext);
+        var codes = MergeRoleCodes(roleCodes, Request);
+        if (!_permissionService.IsAppAdmin(codes, userType))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only app admins can seed presets." });
 
         try
@@ -159,6 +164,16 @@ public sealed class PermissionController : ControllerBase
             ? []
             : roleCodes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
+
+    private static List<string> MergeRoleCodes(string? roleCodesQuery, HttpRequest request)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in SplitCodes(roleCodesQuery))
+            set.Add(c);
+        foreach (var c in PermissionAuthHelper.GetRoleCodes(request))
+            set.Add(c);
+        return set.ToList();
+    }
 
     private bool TryGetAuthContext(out int userId, out int orgId)
     {
