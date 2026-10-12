@@ -110,7 +110,7 @@ public sealed class PermissionController : ControllerBase
         var userType = AuthContextHelper.GetUserType(HttpContext);
         var codes = MergeRoleCodes(roleCodes, Request);
         if (!_permissionService.IsAppAdmin(codes, userType))
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only app admins can edit permissions." });
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only the organisation owner or Appointment Admin can edit permissions." });
 
         try
         {
@@ -145,7 +145,7 @@ public sealed class PermissionController : ControllerBase
         var userType = AuthContextHelper.GetUserType(HttpContext);
         var codes = MergeRoleCodes(roleCodes, Request);
         if (!_permissionService.IsAppAdmin(codes, userType))
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only app admins can seed presets." });
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only the organisation owner or Appointment Admin can seed presets." });
 
         try
         {

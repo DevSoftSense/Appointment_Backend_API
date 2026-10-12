@@ -103,14 +103,57 @@ public sealed class ReminderService : IReminderService
         await _reminderRepository.CancelAsync(orgId, GetAppId(), notificationId, cancellationToken);
     }
 
-    public async Task ProcessDueAsync(CancellationToken cancellationToken = default)
+    public async Task RunWorkerTickAsync(CancellationToken cancellationToken = default)
+    {
+        var appId = GetAppId();
+        var idlePollSeconds = _configuration.GetValue("ReminderWorker:IdlePollSeconds", 15);
+
+        var next = await _reminderRepository.GetNextScheduledAsync(appId, orgId: null, cancellationToken);
+        if (next.NextScheduledAt is { } scheduledAt)
+        {
+            if (scheduledAt > DateTimeOffset.UtcNow)
+            {
+                await DelayUntilAsync(scheduledAt, cancellationToken);
+            }
+        }
+        else
+        {
+            await Task.Delay(TimeSpan.FromSeconds(idlePollSeconds), cancellationToken);
+            return;
+        }
+
+        var processed = 0;
+        int batchCount;
+        do
+        {
+            batchCount = await ProcessDueAsync(cancellationToken);
+            processed += batchCount;
+        }
+        while (batchCount > 0 && !cancellationToken.IsCancellationRequested);
+
+        if (processed > 0)
+        {
+            _logger.LogInformation("Reminder worker sent {Count} email(s)", processed);
+        }
+    }
+
+    public async Task<int> ProcessDueAsync(CancellationToken cancellationToken = default)
     {
         var appId = GetAppId();
         var due = await _reminderRepository.ClaimDueAsync(appId, orgId: null, batchSize: 25, cancellationToken);
+        var sent = 0;
+
         foreach (var item in due)
         {
             try
             {
+                if (item.ScheduledAt is { } scheduledAt)
+                {
+                    var wait = scheduledAt - DateTimeOffset.UtcNow;
+                    if (wait > TimeSpan.Zero)
+                        await Task.Delay(wait, cancellationToken);
+                }
+
                 if (string.IsNullOrWhiteSpace(item.ToAddress) || !item.ToAddress.Contains('@'))
                 {
                     await _reminderRepository.MarkFailedAsync(
@@ -119,7 +162,6 @@ public sealed class ReminderService : IReminderService
                 }
 
                 var body = item.Message ?? "";
-                // Strip leading [Error] blocks from prior failures if reprocessed
                 await _emailSender.SendEmailAsync(
                     item.ToAddress,
                     item.Title ?? "Appointment Reminder",
@@ -127,6 +169,7 @@ public sealed class ReminderService : IReminderService
                     cancellationToken);
 
                 await _reminderRepository.MarkSentAsync(appId, item.NotificationId, (int)item.OrgId, cancellationToken);
+                sent++;
             }
             catch (Exception ex)
             {
@@ -141,6 +184,23 @@ public sealed class ReminderService : IReminderService
                     _logger.LogError(markEx, "Could not mark reminder {Id} failed", item.NotificationId);
                 }
             }
+        }
+
+        return sent;
+    }
+
+    private static async Task DelayUntilAsync(DateTimeOffset targetUtc, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var remaining = targetUtc - DateTimeOffset.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+                return;
+
+            var chunk = remaining > TimeSpan.FromSeconds(2)
+                ? TimeSpan.FromSeconds(1)
+                : remaining;
+            await Task.Delay(chunk, cancellationToken);
         }
     }
 

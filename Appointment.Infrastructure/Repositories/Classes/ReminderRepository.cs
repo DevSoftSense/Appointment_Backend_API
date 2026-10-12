@@ -103,6 +103,18 @@ public sealed class ReminderRepository : IReminderRepository
         await CallAsync("cancel", orgId, appId, notificationId: notificationId);
     }
 
+    public async Task<ReminderNextScheduledDto> GetNextScheduledAsync(
+        int appId, int? orgId, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        var json = await CallAsync("next_scheduled_at", orgId, appId);
+        if (string.IsNullOrWhiteSpace(json) || json == "null")
+            return new ReminderNextScheduledDto();
+
+        return JsonSerializer.Deserialize<ReminderNextScheduledDto>(json, PostgresJsonOptions.Options)
+               ?? new ReminderNextScheduledDto();
+    }
+
     public async Task<IReadOnlyList<ReminderDueItemDto>> ClaimDueAsync(
         int appId, int? orgId, int batchSize, CancellationToken cancellationToken = default)
     {

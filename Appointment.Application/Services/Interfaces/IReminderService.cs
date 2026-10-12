@@ -11,5 +11,10 @@ public interface IReminderService
     Task SyncForAppointmentAsync(int orgId, long appointmentId, long? userId, CancellationToken cancellationToken = default);
     Task CancelForAppointmentAsync(int orgId, long appointmentId, CancellationToken cancellationToken = default);
     Task CancelAsync(int orgId, long notificationId, CancellationToken cancellationToken = default);
-    Task ProcessDueAsync(CancellationToken cancellationToken = default);
+    Task<int> ProcessDueAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sleep until the next pending reminder's scheduled_at, then process all due items.
+    /// </summary>
+    Task RunWorkerTickAsync(CancellationToken cancellationToken = default);
 }

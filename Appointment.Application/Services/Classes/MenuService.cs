@@ -40,7 +40,7 @@ public sealed class MenuService : IMenuService
         var my = await _permissionService.GetMyAsync(
             orgId, roleCodes ?? [], false, userType, cancellationToken);
 
-        // Fail-open / admin → show all
+        // Fail-open / org owner → show all (product *_ADMIN uses matrix)
         if (my.IsAdmin || my.FailOpen)
             return all;
 
@@ -66,15 +66,24 @@ public sealed class MenuService : IMenuService
             return c.Length > 0 && set.Contains(c);
         }
 
+        static bool IsReportsParent(string? menuCode)
+        {
+            var c = (menuCode ?? "").Trim().ToUpperInvariant();
+            return c is "APPOINTMENT_REPORTS" or "REPORTS";
+        }
+
         return all
             .Where(m => IsAllowed(allowed, m.MenuCode))
             .Select(m =>
             {
-                // Filter Settings children by permission too
                 if (m.Children is { Count: > 0 })
                 {
+                    // Settings children: each needs its own permission.
+                    // Reports children: inherit parent APPOINTMENT_REPORTS permission.
                     m.Children = m.Children
-                        .Where(c => IsAllowed(allowed, c.MenuCode))
+                        .Where(c =>
+                            IsAllowed(allowed, c.MenuCode)
+                            || (IsReportsParent(m.MenuCode) && IsAllowed(allowed, m.MenuCode)))
                         .ToList();
                 }
                 return m;
