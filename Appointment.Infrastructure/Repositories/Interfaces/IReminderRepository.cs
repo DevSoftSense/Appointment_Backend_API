@@ -21,6 +21,9 @@ public interface IReminderRepository
 
     Task CancelAsync(int orgId, int appId, long notificationId, CancellationToken cancellationToken = default);
 
+    Task<ReminderNextScheduledDto> GetNextScheduledAsync(
+        int appId, int? orgId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ReminderDueItemDto>> ClaimDueAsync(
         int appId, int? orgId, int batchSize, CancellationToken cancellationToken = default);
 

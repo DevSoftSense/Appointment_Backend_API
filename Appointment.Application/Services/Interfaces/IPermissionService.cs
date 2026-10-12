@@ -25,6 +25,10 @@ public interface IPermissionService
 
     bool IsPrimeUserType(string? userType);
 
+    /// <summary>Org owner (ORG_OWNER / prime) — full ACL bypass only.</summary>
+    bool IsOrgOwner(IEnumerable<string>? roleCodes, string? userType);
+
+    /// <summary>Owner or product *_ADMIN — may Invite / Roles / Save permission matrix.</summary>
     bool IsAppAdmin(IEnumerable<string>? roleCodes, string? userType);
 
     /// <summary>

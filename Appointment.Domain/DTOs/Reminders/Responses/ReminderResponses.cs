@@ -43,6 +43,12 @@ public sealed class ReminderStatsDto
     public int Appointment { get; set; }
 }
 
+public sealed class ReminderNextScheduledDto
+{
+    public DateTimeOffset? NextScheduledAt { get; set; }
+    public bool DueNow { get; set; }
+}
+
 public sealed class ReminderDueItemDto
 {
     public long NotificationId { get; set; }

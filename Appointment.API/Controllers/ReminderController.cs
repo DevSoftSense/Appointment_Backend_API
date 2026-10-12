@@ -146,8 +146,8 @@ public sealed class ReminderController : ControllerBase
 
         try
         {
-            await _reminderService.ProcessDueAsync(cancellationToken);
-            return Ok(new { processed = true });
+            var count = await _reminderService.ProcessDueAsync(cancellationToken);
+            return Ok(new { processed = true, count });
         }
         catch (Exception ex)
         {

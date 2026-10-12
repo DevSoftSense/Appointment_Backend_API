@@ -44,7 +44,7 @@ public sealed class PermissionService : IPermissionService
         return _repository.SaveRoleAsync(orgId, GetAppId(), roleCode.Trim(), request, cancellationToken);
     }
 
-    public Task<MyPermissionsDto> GetMyAsync(
+    public async Task<MyPermissionsDto> GetMyAsync(
         int orgId, IReadOnlyList<string> roleCodes, bool isAdmin, string? userType = null,
         CancellationToken cancellationToken = default)
     {
@@ -55,10 +55,23 @@ public sealed class PermissionService : IPermissionService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // Full ACL bypass = org owner only (product *_ADMIN uses the matrix)
         if (!isAdmin)
-            isAdmin = IsAppAdmin(codes, userType);
+            isAdmin = IsOrgOwner(codes, userType);
 
-        return _repository.GetMyAsync(orgId, GetAppId(), codes, isAdmin, cancellationToken);
+        var my = await _repository.GetMyAsync(orgId, GetAppId(), codes, isAdmin, cancellationToken);
+
+        // Product Admin: keep Owner-selected menus from matrix; always allow Users & Roles
+        // so Admin can Save permissions like Owner (without seeing every other menu by default).
+        if (!my.IsAdmin
+            && !my.FailOpen
+            && !IsOrgOwner(codes, userType)
+            && IsAdminRoleCodes(codes))
+        {
+            my = EnsureProductAdminManagementAccess(my);
+        }
+
+        return my;
     }
 
     public Task SeedPresetsAsync(int orgId, CancellationToken cancellationToken = default)
@@ -71,14 +84,25 @@ public sealed class PermissionService : IPermissionService
         (roleCodes ?? []).Any(IsAdminRoleCode);
 
     /// <summary>
-    /// SoftOnCloud app admins: *_ADMIN, ADMIN, and platform org-owner codes (ORG_OWNER).
+    /// SoftOnCloud org-owner role codes (full ACL bypass + can edit permission matrix).
+    /// </summary>
+    public static bool IsOwnerRoleCode(string? roleCode)
+    {
+        var code = (roleCode ?? "").Trim().ToUpperInvariant();
+        return code is "ORG_OWNER" or "OWNER" or "ORGADMIN";
+    }
+
+    /// <summary>
+    /// SoftOnCloud product admin role (e.g. APPOINTMENT_ADMIN).
+    /// Can manage Users / Roles / Permissions Save; sidebar still follows the matrix
+    /// (does <b>not</b> get full ACL bypass — that is Owner only).
     /// </summary>
     public static bool IsAdminRoleCode(string? roleCode)
     {
         var code = (roleCode ?? "").Trim().ToUpperInvariant();
-        if (code.Length == 0) return false;
+        if (code.Length == 0 || IsOwnerRoleCode(code)) return false;
         if (code.EndsWith("_ADMIN", StringComparison.Ordinal)) return true;
-        return code is "APPOINTMENT_ADMIN" or "ADMIN" or "ORG_OWNER" or "OWNER" or "ORGADMIN";
+        return code is "APPOINTMENT_ADMIN" or "ADMIN";
     }
 
     public bool IsPrimeUserType(string? userType)
@@ -87,8 +111,19 @@ public sealed class PermissionService : IPermissionService
         return t is "prime" or "owner" or "org_owner";
     }
 
+    /// <summary>
+    /// Organisation owner only (ORG_OWNER / OWNER / ORGADMIN or userType prime).
+    /// Full sidebar bypass. Product <c>*_ADMIN</c> is not owner.
+    /// </summary>
+    public bool IsOrgOwner(IEnumerable<string>? roleCodes, string? userType) =>
+        (roleCodes ?? []).Any(IsOwnerRoleCode) || IsPrimeUserType(userType);
+
+    /// <summary>
+    /// Who may manage Users / Roles / Permissions (Save / Seed / Invite).
+    /// Owner <b>or</b> product Admin (<c>*_ADMIN</c>). ACL bypass remains Owner-only via GetMyAsync.
+    /// </summary>
     public bool IsAppAdmin(IEnumerable<string>? roleCodes, string? userType) =>
-        IsAdminRoleCodes(roleCodes) || IsPrimeUserType(userType);
+        IsOrgOwner(roleCodes, userType) || IsAdminRoleCodes(roleCodes);
 
     public async Task<bool> CanAsync(
         int orgId,
@@ -120,6 +155,50 @@ public sealed class PermissionService : IPermissionService
             "delete" => module.CanDelete,
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Menus product Admin always gets so they can open Settings → Users &amp; Roles
+    /// and Save the matrix (same capability as Owner for permission management).
+    /// </summary>
+    private static readonly string[] ProductAdminManagementMenuCodes =
+    [
+        "APPOINTMENT_SETTINGS",
+        "APPOINTMENT_SETTINGS_USERS_ROLES",
+        "SETTINGS",
+        "SETTINGS_USERS_ROLES",
+    ];
+
+    private static MyPermissionsDto EnsureProductAdminManagementAccess(MyPermissionsDto my)
+    {
+        var list = (my.Modules ?? []).ToList();
+        foreach (var code in ProductAdminManagementMenuCodes)
+        {
+            var existing = list.FirstOrDefault(m => MenuCodeMatches(m.MenuCode, code));
+            if (existing is not null)
+            {
+                existing.CanView = true;
+                existing.CanAdd = true;
+                existing.CanEdit = true;
+                existing.CanDelete = true;
+                continue;
+            }
+
+            list.Add(new PermissionModuleDto
+            {
+                MenuCode = code,
+                MenuName = code.Contains("USERS_ROLES", StringComparison.OrdinalIgnoreCase)
+                    ? "Users & Roles"
+                    : "Settings",
+                CanView = true,
+                CanAdd = true,
+                CanEdit = true,
+                CanDelete = true,
+            });
+        }
+
+        my.Modules = list;
+        return my;
     }
 
     /// <summary>Match CUSTOMERS ↔ APPOINTMENT_CUSTOMERS (live SoftOnCloud prefix).</summary>
