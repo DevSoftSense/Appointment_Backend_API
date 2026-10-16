@@ -43,19 +43,34 @@ public sealed class PermissionRepository : IPermissionRepository
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
+        if (request.RoleId is null or <= 0)
+            throw new ArgumentException("SoftOnCloud role id is required to save permissions.");
+
+        var softRoleId = request.RoleId.Value;
+
+        // DB save_role expects a JSON array of menu flags (not an object).
+        // SoftOnCloud role id is passed separately as p_role_id (8th fn arg).
         var payload = JsonSerializer.Serialize(
-            (request.Items ?? []).Select(i => new
+            (request.Items ?? []).Select(i => new Dictionary<string, object?>
             {
-                menu_code = i.MenuCode,
-                can_view = i.CanView,
-                can_add = i.CanAdd,
-                can_edit = i.CanEdit,
-                can_delete = i.CanDelete
-            }),
-            PostgresJsonOptions.Options);
+                ["menu_code"] = i.MenuCode,
+                ["can_view"] = i.CanView,
+                ["can_add"] = i.CanAdd,
+                ["can_edit"] = i.CanEdit,
+                ["can_delete"] = i.CanDelete
+            }).ToList());
+
+        _logger.LogInformation(
+            "save_role org={OrgId} app={AppId} roleCode={RoleCode} roleId={RoleId}",
+            orgId, appId, roleCode, softRoleId);
 
         var json = await CallAsync(
-            "save_role", orgId, appId, roleCode: roleCode, payloadJson: payload);
+            "save_role",
+            orgId,
+            appId,
+            roleCode: roleCode,
+            payloadJson: payload,
+            roleId: softRoleId);
         return DeserializeList(json);
     }
 
@@ -91,7 +106,8 @@ public sealed class PermissionRepository : IPermissionRepository
         string? roleCode = null,
         bool isAdmin = false,
         string? payloadJson = null,
-        string[]? roleCodes = null)
+        string[]? roleCodes = null,
+        int? roleId = null)
     {
         try
         {
@@ -103,7 +119,8 @@ public sealed class PermissionRepository : IPermissionRepository
                 Varchar(roleCode),
                 Bool(isAdmin),
                 Jsonb(payloadJson),
-                TextArray(roleCodes));
+                TextArray(roleCodes),
+                NullableInt(roleId));
         }
         catch (PostgresException ex)
         {
@@ -122,6 +139,13 @@ public sealed class PermissionRepository : IPermissionRepository
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };
+
+    private static NpgsqlParameter NullableInt(int? value) =>
+        new()
+        {
+            Value = value is > 0 ? value.Value : DBNull.Value,
+            NpgsqlDbType = NpgsqlDbType.Integer
+        };
 
     private static NpgsqlParameter Varchar(string? value) =>
         new()

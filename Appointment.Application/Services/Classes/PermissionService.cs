@@ -41,6 +41,9 @@ public sealed class PermissionService : IPermissionService
         if (string.IsNullOrWhiteSpace(roleCode))
             throw new ArgumentException("Role code is required.", nameof(roleCode));
         request ??= new SaveRolePermissionsRequest();
+        if (request.RoleId is null or <= 0)
+            throw new ArgumentException(
+                "SoftOnCloud role id is required to save permissions.", nameof(request.RoleId));
         return _repository.SaveRoleAsync(orgId, GetAppId(), roleCode.Trim(), request, cancellationToken);
     }
 
