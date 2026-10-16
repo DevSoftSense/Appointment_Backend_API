@@ -96,12 +96,13 @@ public sealed class PermissionController : ControllerBase
         }
     }
 
-    /// <summary>PUT api/permissions/roles/{roleCode}</summary>
+    /// <summary>PUT api/permissions/roles/{roleCode}?roleId=…</summary>
     [HttpPut("roles/{roleCode}")]
     public async Task<IActionResult> SaveRoleAsync(
         string roleCode,
         [FromBody] SaveRolePermissionsRequest request,
         [FromQuery] string? roleCodes,
+        [FromQuery] int? roleId,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAuthContext(out _, out var orgId))
@@ -111,6 +112,11 @@ public sealed class PermissionController : ControllerBase
         var codes = MergeRoleCodes(roleCodes, Request);
         if (!_permissionService.IsAppAdmin(codes, userType))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only the organisation owner or Appointment Admin can edit permissions." });
+
+        request ??= new SaveRolePermissionsRequest();
+        // Body roleId preferred; query ?roleId= as backup
+        if (request.RoleId is null or <= 0 && roleId is > 0)
+            request.RoleId = roleId;
 
         try
         {
