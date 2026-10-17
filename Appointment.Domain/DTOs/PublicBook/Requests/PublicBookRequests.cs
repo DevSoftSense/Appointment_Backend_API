@@ -30,6 +30,8 @@ public sealed class PublicCreateAppointmentRequest
     public long? ProfessionalId { get; set; }
     public long ProductId { get; set; }
     public long? BranchId { get; set; }
+    /// <summary>Required when the service has is_resource_required (existing cabin_resource_id column).</summary>
+    public long? CabinResourceId { get; set; }
     public DateTimeOffset StartDatetime { get; set; }
     public DateTimeOffset? EndDatetime { get; set; }
     public DateOnly? AppointmentDate { get; set; }

@@ -147,6 +147,100 @@ public sealed class FollowUpController : ControllerBase
         }
     }
 
+    /// <summary>POST api/appointments/{id}/follow-ups/mark-done</summary>
+    [HttpPost("mark-done")]
+    public async Task<IActionResult> MarkPlanDoneAsync(
+        long appointmentId, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out var userId, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _followUpService.MarkPlanDoneAsync(
+                orgId, appointmentId, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Mark follow-up plan done failed for {AppointmentId}", appointmentId);
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled mark-done for appointment {AppointmentId}", appointmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to mark follow-up plan done." });
+        }
+    }
+
+    /// <summary>POST api/appointments/{id}/follow-ups/mark-open</summary>
+    [HttpPost("mark-open")]
+    public async Task<IActionResult> MarkPlanOpenAsync(
+        long appointmentId, CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out var userId, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _followUpService.MarkPlanOpenAsync(
+                orgId, appointmentId, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Mark follow-up plan open failed for {AppointmentId}", appointmentId);
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled mark-open for appointment {AppointmentId}", appointmentId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to reopen follow-up plan." });
+        }
+    }
+
+    /// <summary>POST api/appointments/{id}/follow-ups/{childId}/cancel</summary>
+    [HttpPost("{childId:long}/cancel")]
+    public async Task<IActionResult> CancelChildAsync(
+        long appointmentId,
+        long childId,
+        [FromBody] CancelFollowUpChildRequest? request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetAuthContext(out var userId, out var orgId))
+            return Unauthorized(new { message = "Invalid or missing authentication token." });
+
+        try
+        {
+            var result = await _followUpService.CancelChildAsync(
+                orgId, appointmentId, childId, userId,
+                request?.CancellationReason, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "Cancel follow-up child {ChildId} failed under {AppointmentId}", childId, appointmentId);
+            return BadRequest(new { message = AuthExceptionHelper.GetUserFacingMessage(ex) });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled cancel follow-up child {ChildId}", childId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to cancel follow-up." });
+        }
+    }
+
     private bool TryGetAuthContext(out long userId, out int orgId)
     {
         userId = 0;

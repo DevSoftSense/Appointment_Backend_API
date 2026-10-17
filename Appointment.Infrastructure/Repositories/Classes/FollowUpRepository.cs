@@ -111,6 +111,66 @@ public sealed class FollowUpRepository : IFollowUpRepository
         }
     }
 
+    public async Task<AppointmentDetailDto> MarkPlanDoneAsync(
+        int orgId, int appId, long parentAppointmentId, long? updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync(
+                "mark_plan_done", orgId, appId, parentAppointmentId, createdBy: updatedBy);
+            return DeserializeDetail(json);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} mark_plan_done", Fn);
+            throw;
+        }
+    }
+
+    public async Task<AppointmentDetailDto> MarkPlanOpenAsync(
+        int orgId, int appId, long parentAppointmentId, long? updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var json = await CallAsync(
+                "mark_plan_open", orgId, appId, parentAppointmentId, createdBy: updatedBy);
+            return DeserializeDetail(json);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} mark_plan_open", Fn);
+            throw;
+        }
+    }
+
+    public async Task<AppointmentDetailDto> CancelChildAsync(
+        int orgId, int appId, long parentAppointmentId, long childAppointmentId, long? updatedBy,
+        string? cancellationReason, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        try
+        {
+            var payload = JsonSerializer.Serialize(new Dictionary<string, object?>
+            {
+                ["child_appointment_id"] = childAppointmentId,
+                ["cancellation_reason"] = cancellationReason
+            });
+            var json = await CallAsync(
+                "cancel_child", orgId, appId, parentAppointmentId,
+                createdBy: updatedBy, payload: payload);
+            return DeserializeDetail(json);
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogWarning(ex, "PostgreSQL error in {Fn} cancel_child", Fn);
+            throw;
+        }
+    }
+
     private static string BuildOnePayload(CreateFollowUpRequest request)
     {
         var payload = new Dictionary<string, object?>

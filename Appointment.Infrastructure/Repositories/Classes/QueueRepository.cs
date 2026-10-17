@@ -182,6 +182,7 @@ public sealed class QueueRepository : IQueueRepository
                 professionalId: request.ProfessionalId,
                 productId: request.ProductId,
                 branchId: request.BranchId,
+                cabinResourceId: request.CabinResourceId,
                 notes: request.Notes,
                 expectedDurationMinutes: request.ExpectedDurationMinutes,
                 createdBy: createdBy);
@@ -295,7 +296,8 @@ public sealed class QueueRepository : IQueueRepository
         long? updatedBy = null,
         int? limit = null,
         int? offset = null,
-        int? fiscalYearId = null) =>
+        int? fiscalYearId = null,
+        long? cabinResourceId = null) =>
         _db.ExecuteJsonFunctionAsync(
             Fn,
             Varchar(action),
@@ -316,7 +318,8 @@ public sealed class QueueRepository : IQueueRepository
             Bigint(updatedBy),
             NullableInt(limit),
             NullableInt(offset),
-            NullableInt(fiscalYearId));
+            NullableInt(fiscalYearId),
+            Bigint(cabinResourceId));
 
     private static NpgsqlParameter Int(int value) =>
         new() { Value = value, NpgsqlDbType = NpgsqlDbType.Integer };
