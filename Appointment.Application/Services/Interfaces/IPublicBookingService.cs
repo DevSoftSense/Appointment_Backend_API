@@ -1,4 +1,5 @@
 using Appointment.Domain.DTOs.Appointments.Responses;
+using Appointment.Domain.DTOs.Cabins.Responses;
 using Appointment.Domain.DTOs.Customers.Responses;
 using Appointment.Domain.DTOs.Professionals.Responses;
 using Appointment.Domain.DTOs.PublicBook.Requests;
@@ -40,6 +41,11 @@ public interface IPublicBookingService
         int orgId,
         int employeeId,
         DateOnly? asOfDate = null,
+        CancellationToken cancellationToken = default);
+
+    Task<CabinListResponse> GetCabinsAsync(
+        int orgId,
+        int? branchId = null,
         CancellationToken cancellationToken = default);
 
     Task<AppointmentDetailDto> CreateAppointmentAsync(

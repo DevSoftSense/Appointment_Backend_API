@@ -242,6 +242,31 @@ public sealed class PublicBookController : ControllerBase
         }
     }
 
+    [HttpGet("cabins")]
+    public async Task<IActionResult> GetCabinsAsync(
+        [FromQuery] string? t,
+        [FromQuery] int? branchId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryResolveOrg(t, out var orgId, out var error))
+            return error!;
+
+        try
+        {
+            var result = await _publicBookingService.GetCabinsAsync(orgId, branchId, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Public cabins failed");
+            return StatusCode(500, new { message = "Unable to load cabins." });
+        }
+    }
+
     [HttpPost("appointments")]
     public async Task<IActionResult> CreateAppointmentAsync(
         [FromBody] PublicCreateAppointmentRequest request,

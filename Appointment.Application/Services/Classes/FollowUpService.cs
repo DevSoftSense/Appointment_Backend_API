@@ -128,6 +128,54 @@ public sealed class FollowUpService : IFollowUpService
         return result;
     }
 
+    public async Task<AppointmentDetailDto> MarkPlanDoneAsync(
+        int orgId, long parentAppointmentId, long updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (parentAppointmentId <= 0)
+            throw new ArgumentException("Parent appointment id is required.");
+        if (updatedBy <= 0)
+            throw new ArgumentException("Updated-by user is required.");
+
+        return await _repository.MarkPlanDoneAsync(
+            orgId, GetAppId(), parentAppointmentId, updatedBy, cancellationToken);
+    }
+
+    public async Task<AppointmentDetailDto> MarkPlanOpenAsync(
+        int orgId, long parentAppointmentId, long updatedBy,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (parentAppointmentId <= 0)
+            throw new ArgumentException("Parent appointment id is required.");
+        if (updatedBy <= 0)
+            throw new ArgumentException("Updated-by user is required.");
+
+        return await _repository.MarkPlanOpenAsync(
+            orgId, GetAppId(), parentAppointmentId, updatedBy, cancellationToken);
+    }
+
+    public async Task<AppointmentDetailDto> CancelChildAsync(
+        int orgId, long parentAppointmentId, long childAppointmentId, long updatedBy,
+        string? cancellationReason = null, CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        if (parentAppointmentId <= 0)
+            throw new ArgumentException("Parent appointment id is required.");
+        if (childAppointmentId <= 0)
+            throw new ArgumentException("Follow-up appointment id is required.");
+        if (updatedBy <= 0)
+            throw new ArgumentException("Updated-by user is required.");
+
+        var cancelled = await _repository.CancelChildAsync(
+            orgId, GetAppId(), parentAppointmentId, childAppointmentId, updatedBy,
+            cancellationReason, cancellationToken);
+
+        await _reminderService.CancelForAppointmentAsync(orgId, childAppointmentId, cancellationToken);
+        return cancelled;
+    }
+
     private async Task EnsureInBookingWindowAsync(
         int orgId, DateTimeOffset start, CancellationToken cancellationToken)
     {

@@ -10,15 +10,18 @@ namespace Appointment.Application.Services.Classes;
 public sealed class QueueService : IQueueService
 {
     private readonly IQueueRepository _queueRepository;
+    private readonly IReminderService _reminderService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<QueueService> _logger;
 
     public QueueService(
         IQueueRepository queueRepository,
+        IReminderService reminderService,
         IConfiguration configuration,
         ILogger<QueueService> logger)
     {
         _queueRepository = queueRepository;
+        _reminderService = reminderService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -99,7 +102,17 @@ public sealed class QueueService : IQueueService
             "Queue walk-in org={OrgId} customer={CustomerId} professional={ProfessionalId}",
             orgId, request.CustomerId, request.ProfessionalId?.ToString() ?? "(none)");
 
-        return await _queueRepository.AddWalkInAsync(orgId, GetAppId(), createdBy, request, cancellationToken);
+        var created = await _queueRepository.AddWalkInAsync(
+            orgId, GetAppId(), createdBy, request, cancellationToken);
+
+        // Sync reminder when walk-in slot is still in the future (SQL skips already-past)
+        if (created.AppointmentId is > 0)
+        {
+            await _reminderService.SyncForAppointmentAsync(
+                orgId, created.AppointmentId.Value, createdBy, cancellationToken);
+        }
+
+        return created;
     }
 
     public Task<QueueListItemDto> CallAsync(

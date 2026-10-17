@@ -2,6 +2,8 @@ using Appointment.Application.Helpers;
 using Appointment.Application.Services.Interfaces;
 using Appointment.Domain.DTOs.Appointments.Requests;
 using Appointment.Domain.DTOs.Appointments.Responses;
+using Appointment.Domain.DTOs.Cabins.Requests;
+using Appointment.Domain.DTOs.Cabins.Responses;
 using Appointment.Domain.DTOs.Customers.Requests;
 using Appointment.Domain.DTOs.Customers.Responses;
 using Appointment.Domain.DTOs.Professionals.Requests;
@@ -24,6 +26,7 @@ public sealed class PublicBookingService : IPublicBookingService
     private readonly ICustomerService _customerService;
     private readonly IServiceCatalogService _serviceCatalogService;
     private readonly IProfessionalService _professionalService;
+    private readonly ICabinService _cabinService;
     private readonly IAppointmentService _appointmentService;
     private readonly ISettingsService _settingsService;
     private readonly IConfiguration _configuration;
@@ -33,6 +36,7 @@ public sealed class PublicBookingService : IPublicBookingService
         ICustomerService customerService,
         IServiceCatalogService serviceCatalogService,
         IProfessionalService professionalService,
+        ICabinService cabinService,
         IAppointmentService appointmentService,
         ISettingsService settingsService,
         IConfiguration configuration,
@@ -41,6 +45,7 @@ public sealed class PublicBookingService : IPublicBookingService
         _customerService = customerService;
         _serviceCatalogService = serviceCatalogService;
         _professionalService = professionalService;
+        _cabinService = cabinService;
         _appointmentService = appointmentService;
         _settingsService = settingsService;
         _configuration = configuration;
@@ -191,6 +196,37 @@ public sealed class PublicBookingService : IPublicBookingService
         return _professionalService.GetScheduleAsync(orgId, employeeId, asOfDate, cancellationToken);
     }
 
+    public async Task<CabinListResponse> GetCabinsAsync(
+        int orgId,
+        int? branchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOrg(orgId);
+        // Load all active cabins; when branchId is set, keep cabins for that branch or unscoped (Any).
+        var result = await _cabinService.GetCabinsAsync(
+            orgId,
+            new GetCabinsRequest
+            {
+                IsActive = true,
+                Limit = 100,
+                Offset = 0
+            },
+            cancellationToken);
+
+        if (branchId is null or <= 0)
+            return result;
+
+        var filtered = result.Items
+            .Where(c => c.BranchId is null || c.BranchId == branchId)
+            .ToList();
+
+        return new CabinListResponse
+        {
+            Items = filtered,
+            TotalCount = filtered.Count
+        };
+    }
+
     public async Task<AppointmentDetailDto> CreateAppointmentAsync(
         PublicCreateAppointmentRequest request,
         CancellationToken cancellationToken = default)
@@ -204,13 +240,29 @@ public sealed class PublicBookingService : IPublicBookingService
         if (customer is null)
             throw new ArgumentException("Customer was not found for this organisation.");
 
+        long? branchId = request.BranchId
+            ?? (customer.BranchId.HasValue ? customer.BranchId.Value : null);
+
+        // Prefer professional's branch when client omitted location (existing employee.branch_id).
+        if ((!branchId.HasValue || branchId.Value <= 0) && request.ProfessionalId is > 0)
+        {
+            var pro = await _professionalService.GetProfessionalByIdAsync(
+                request.OrgId, (int)request.ProfessionalId.Value, cancellationToken);
+            if (pro?.BranchId > 0)
+                branchId = pro.BranchId;
+        }
+
+        if (!branchId.HasValue || branchId.Value <= 0)
+            throw new ArgumentException("Location (branch) is required. Choose a professional at a branch, or ask the clinic to set your home branch.");
+
         var createdBy = GetSystemUserId();
         var create = new CreateAppointmentRequest
         {
             CustomerId = request.CustomerId,
             ProfessionalId = request.ProfessionalId,
             ProductId = request.ProductId,
-            BranchId = request.BranchId ?? (customer.BranchId.HasValue ? customer.BranchId.Value : null),
+            BranchId = branchId,
+            CabinResourceId = request.CabinResourceId,
             StartDatetime = request.StartDatetime,
             EndDatetime = request.EndDatetime,
             AppointmentDate = request.AppointmentDate,
