@@ -2,6 +2,9 @@ using System.Text;
 using System.Text.Json;
 using Appointment.Application.Services.Classes;
 using Appointment.Application.Services.Interfaces;
+using Appointment.API.Hubs;
+using Appointment.API.Middleware;
+using Appointment.API.Services;
 using Appointment.Infrastructure.Data;
 using Appointment.Infrastructure.Repositories.Classes;
 using Appointment.Infrastructure.Repositories.Interfaces;
@@ -65,6 +68,10 @@ builder.Services.AddHttpClient("SoftOnCloud", client =>
 
 builder.Services.AddScoped<ITenantConnectionFactory, SoftOnCloudTenantConnectionFactory>();
 builder.Services.AddScoped<IPublicBookOrgContext, PublicBookOrgContext>();
+builder.Services.AddSingleton<SoftOnCloudSessionValidator>();
+builder.Services.AddSingleton<SessionRevocationStore>();
+builder.Services.AddSingleton<ISessionForceLogoutNotifier, SessionForceLogoutNotifier>();
+builder.Services.AddSignalR();
 
 // ─── Infrastructure helpers ───────────────────────────────────────────────────
 // Product DB: SoftOnCloud product-connection (JWT staff) or /service (QR) or local SecondConnection.
@@ -161,6 +168,7 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
+    options.MapInboundClaims = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer           = true,
@@ -170,18 +178,47 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer              = jwtIssuer,
         ValidAudience            = jwtAudience,
         IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-        ClockSkew                = TimeSpan.FromMinutes(1)
+        ClockSkew                = TimeSpan.FromMinutes(1),
+        NameClaimType            = "user_id",
+        RoleClaimType            = "role"
     };
 
     options.Events = new JwtBearerEvents
     {
+        // SignalR cannot set Authorization header on WebSocket — token via query.
+        OnMessageReceived = context =>
+        {
+            var path = context.HttpContext.Request.Path;
+            if (path.StartsWithSegments("/hubs/session"))
+            {
+                var accessToken = context.Request.Query["access_token"].FirstOrDefault();
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    var auth = context.Request.Headers.Authorization.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(auth)
+                        && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        accessToken = auth["Bearer ".Length..].Trim();
+                    }
+                }
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+            }
+            return Task.CompletedTask;
+        },
         OnChallenge = async context =>
         {
             context.HandleResponse();
             context.Response.StatusCode  = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(
-                JsonSerializer.Serialize(new { message = "Your session has ended. Please sign in again." }));
+                JsonSerializer.Serialize(new
+                {
+                    message = "Your session has ended. Please sign in again.",
+                    code = "SESSION_ENDED"
+                }));
         }
     };
 });
@@ -240,7 +277,12 @@ app.UseExceptionHandler(errorApp =>
             _ => "Unexpected server error. Please try again."
         };
 
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new { message }));
+        // Include code so UI can show password_changed vs session_ended when SoftOnCloud rejects live DB.
+        object payload = ex is UnauthorizedAccessException
+            ? new { message, code = "SESSION_ENDED" }
+            : new { message };
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
     });
 });
 
@@ -259,8 +301,11 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+// SoftOnCloud password + logout revoke on REST; SignalR push handles cross-browser instant kick.
+app.UseMiddleware<SoftOnCloudSessionMiddleware>();
 
 app.MapGet("/", () => "Appointment API is running");
 app.MapControllers();
+app.MapHub<SessionHub>("/hubs/session");
 
 app.Run();
